@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.1.1">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"yoursite.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="github: https:&#x2F;&#x2F;github.com&#x2F;wwow1&#x2F;MIT-6.824（课程实验是按照17年的内容做的） （给大家分享另外一篇关于lab2测试用例的文章，我认为写的很好。https:&#x2F;&#x2F;www.jianshu.com&#x2F;p&#x2F;1df5b7227719  ) 前几天终于完成了6.824的lab2，做lab2的时候能明显的感觉到lab2的难度和lab1相比还是有较大提升的，在搜索相关信息的时">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MIT-6.824-lab2-raft（实验内容+测试用例讲解）">
+<meta property="og:url" content="http://yoursite.com/2020/02/14/mit-6-824-raft%EF%BC%88%E5%AE%9E%E9%AA%8C%E5%86%85%E5%AE%B9%E6%B5%8B%E8%AF%95%E7%94%A8%E4%BE%8B%E8%AE%B2%E8%A7%A3%EF%BC%89/index.html">
+<meta property="og:site_name" content="wwow&#39;s blog">
+<meta property="og:description" content="github: https:&#x2F;&#x2F;github.com&#x2F;wwow1&#x2F;MIT-6.824（课程实验是按照17年的内容做的） （给大家分享另外一篇关于lab2测试用例的文章，我认为写的很好。https:&#x2F;&#x2F;www.jianshu.com&#x2F;p&#x2F;1df5b7227719  ) 前几天终于完成了6.824的lab2，做lab2的时候能明显的感觉到lab2的难度和lab1相比还是有较大提升的，在搜索相关信息的时">
+<meta property="og:locale">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/EMDCBAQRLLWOL7AUJPGYT.png">
+<meta property="article:published_time" content="2020-02-14T09:39:59.000Z">
+<meta property="article:modified_time" content="2020-08-30T04:00:58.605Z">
+<meta property="article:author" content="wwow">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/EMDCBAQRLLWOL7AUJPGYT.png">
+
+<link rel="canonical" href="http://yoursite.com/2020/02/14/mit-6-824-raft%EF%BC%88%E5%AE%9E%E9%AA%8C%E5%86%85%E5%AE%B9%E6%B5%8B%E8%AF%95%E7%94%A8%E4%BE%8B%E8%AE%B2%E8%A7%A3%EF%BC%89/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-Hans'
+  };
+</script>
+
+  <title>MIT-6.824-lab2-raft（实验内容+测试用例讲解） | wwow's blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">wwow's blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/02/14/mit-6-824-raft%EF%BC%88%E5%AE%9E%E9%AA%8C%E5%86%85%E5%AE%B9%E6%B5%8B%E8%AF%95%E7%94%A8%E4%BE%8B%E8%AE%B2%E8%A7%A3%EF%BC%89/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/uploads/avatar.png">
+      <meta itemprop="name" content="wwow">
+      <meta itemprop="description" content="努力不一定会成功，但不努力真的很舒服">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="wwow's blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          MIT-6.824-lab2-raft（实验内容+测试用例讲解）
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-02-14 17:39:59" itemprop="dateCreated datePublished" datetime="2020-02-14T17:39:59+08:00">2020-02-14</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-08-30 12:00:58" itemprop="dateModified" datetime="2020-08-30T12:00:58+08:00">2020-08-30</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/mit6-824/" itemprop="url" rel="index"><span itemprop="name">mit6.824</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p><a target="_blank" rel="noopener" href="https://github.com/wwow1/MIT-6.824">github: https://github.com/wwow1/MIT-6.824（课程实验是按照17年的内容做的）</a></p>
+<p>（给大家分享另外一篇关于lab2测试用例的文章，我认为写的很好。<a target="_blank" rel="noopener" href="https://www.jianshu.com/p/1df5b7227719">https://www.jianshu.com/p/1df5b7227719  )</a></p>
+<p>前几天终于完成了6.824的lab2，做lab2的时候能明显的感觉到lab2的难度和lab1相比还是有较大提升的，在搜索相关信息的时候也能感觉到，写lab1的blog很多，但写lab2的blog就少得多。写这篇文章主要是给在lab2中遇到困难和瓶颈的同学提供一些思路，还有就是对于实验的测试用例做一个讲解，在lab2中调试占据了实验的很大一部分时间，在调试的过程中如果能够明白测试的内容，也能更加高效的debug。</p>
+<p>lab2的任务是根据Raft的论文来实现Raft协议，所以在做lab2之前大家一定要认真的去看Raft的paper，具体的理解Raft的一些机制。对于英语不好的同学也可以参考Raft论文的中文翻译。同时课程主页上也提供了曾经6.824课程助教的博客，博客中提供了许多大家可能犯的错误，在开始实验之前大家务必要花时间去看，这上面的建议和易错点真的非常有用！！！！！</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/maemual/raft-zh_cn/blob/master/raft-zh_cn.md">Raft中文翻译:https://github.com/maemual/raft-zh_cn/blob/master/raft-zh_cn.md</a></p>
+<p>Part A</p>
+<p>第一部分的任务是实现领导选举和心跳机制，这一部分比较简单。实验要求在raft.go中编写你的代码，在raft.go中也提供了不同函数的用途以及目前是否需要填写信息。PartA的内容只需要<strong>严格按照Raft论文的Figure2</strong>来做就行。</p>
+<p>这里首先要完善Raft结构的内容，还有用于RPC调用的AppendEntriesArgs，AppendEntriesReply，RequestVoteArgs，RequestVoteReply结构体，同时要编写RequestVote和AppendEntries的具体内容，前者是用于领导选举的投票，后者是用于心跳，RequestVote在这一部分不需要加入”up to date”的内容，因为PartA未涉及到日志的内容。而AppendEntries目前只用于心跳，所以只需要在被调用时重置election timeout就行了。</p>
+<p>在RPC部分完成后，需要完善Make函数(用于初始化一个节点)，同时在每一个节点中设置election timeout，每一个节点一开始都是follower，当固定时间内未收到心跳或未向candidate投票，则由follower转为candidate，同时发起选举，选举结束后确定下一步的状态（在发起选举后的行为在论文中的Figure2中写的非常详细，照着写就行）</p>
+<p>测试1：TestInitialElection2A</p>
+<p>使用三个节点，首先确认集群中是否由leader存在（不存在则报错），然后获取集群当前的term，在一小段时间后，再次获取集群的term，在此期间没有任何错误发生，所以前后两次的term应该相同（不同则报错）</p>
+<p>测试2：TestReElection2A</p>
+<p>使用三个节点，首先确定集群中的leader存在（不存在则报错）记为leader1，然后将leader从集群中断开，这时再次确认集群中是否选举出了新的leader（不存在则报错）</p>
+<p>使leader1重返集群，这时再次判断集群中的leader是否存在（不存在则报错），记为leader2，然后将leader2以及另一个server从集群中断开，这时集群中目前只有1个节点，且它的身份为follwer，则这时集群中的1个节点无法选举得到leader（如果集群中存在leader则报错）</p>
+<p>使leader2重返集群，集群中存在2个节点，则应该存在leader（不存在则报错）</p>
+<p>Part B</p>
+<p>第二部分算是lab2中最复杂的一块，同时也非常容易出错。这一部分的任务是实现添加日志，提交日志的功能。与PartA相同，主要是尽可能地按照Figure2的内容做，但是与PartA不同的地方在于，PartB中存在一些Figure2中没有细说的corner case。</p>
+<p>我们首先还是完善RPC部分的内容（因为这一部分的内容相对比较独立，且Figure2描述的很清晰），首先是RPC的结构中要加入与log有关的变量，对于RequestVote的处理，只需要在投票前增加一个“as up to date as me”的判断就行（具体内容看paper5.4.1）对于AppendEntries的处理也是按照Figure2的内容来做就行（这一块有一些小问题在后续的测试讲解部分会说到）。</p>
+<p>然后是Start函数的填写，该函数是由客户端调用的，每一次调用Start传入一个command，如果当前函数的处理者不是leader则直接返回，如果是leader则开启一个goroutine向所有follower发送AppendEntries来添加日志条目，注意Start函数不应该等待添加日志条目的过程，而应该快速的返回，所以这里要使用goroutine。</p>
+<p>最后，还应该拥有日志的提交功能和应用功能，当某个日志条目（该日志条目必须是在本周期被加入日志中）被复制到过半数的server上时，应该将该日志条目提交，在日志条目提交后，还应该被添加到ApplyCh中（“应用”）。对于这两个功能的实现，我的做法是在一个节点被Make时开启一个goroutine来持续性地检测和Apply条目。在节点被选举为leader时，开启一个goroutine来持续性的检测和commit条目（注意只有leader需要检测并commit，follower们在接受AppendEntries的请求时会根据leader的情况来更新自己的commitIndex）</p>
+<p>易错点</p>
+<p>1.在修改volatile类的变量时（如commitIndex,lastApplied)，要记得加锁，否则很容易尝试错误且难以发现。（例如Start中将条目加入leader的log时要上锁，不然就会出错）。</p>
+<p>2.Start中在RPC发送失败时会重复发送直到成功为止，但要防止出现当前节点已经不是leader但是仍然持续发送AppendEntries的情况。</p>
+<p>3.leader发送的RPC请求可能乱序，即先发送的RPC后收到，但后发送的RPC先收到。</p>
+<p>4.即使是心跳，也要进行prevLog的一致性检查</p>
+<p>5.在prevLog能够正确时，每一次AppendEntries RPC应该要将leader的<strong>全部条目</strong>（当前传入的）赋给server。添加日志时nextIndex的值只是一个“试探”，而不应该将它作为新增日志的具体下标。当client<strong>同时</strong>发送5个command给leader时，这五条command使用的nextIndex必定是相同的（nextIndex在AppendEntries返回时才会修改）这种情况下，如果将nextIndex作为下一条新增条目的下标就会造成覆盖。如果不依赖nextIndex，而是在每一次Append调用中都将传入的Log全部更新到server上就不会出问题。</p>
+<p>6.<strong>在prevLog正确的情况下</strong>，如果server的Log长度比AppendEntriesArgs中的Log更长的话，切记不能截断多出的部分。这是由于RPC乱序，含有更多条目的AppendEntries先改变了server的Log。如果这里截断server的Log的话，相当于把正确的Log给删除了，且后续它们可能不会再出现（因为含有它们的AppendEntries已经完成了）  </p>
+<p>测试3：TestBasicAgree2B</p>
+<p>使用5个节点，向集群发送5条命令，查看这五条命令是否被所有节点apply到applyCh中</p>
+<p>测试4：TestFailAgree2B</p>
+<p>使用3个节点，首先发送一条命令（101），这条命令应该被所有节点接受并apply。</p>
+<p>然后将一个server断开，再连续发送4条命令（102，103，104，105）到集群中，这些命令应该被集群中剩下的2个节点接受并apply。</p>
+<p>将断开的那个节点恢复，然后发送两条命令（106，107），这两条命令应该被所有节点接受并提交。</p>
+<p>（事实上，对于每个节点而言，最终它的日志中都应该包含从101~107的所有命令，即使是曾经从集群中断开也一样）</p>
+<p>测试5：TestFailNoAgree2B</p>
+<p>使用5个节点，首先发送一条命令（10），每个节点都应接受并apply。</p>
+<p>然后将3个follower断开，然后再提交一条命令（20）给集群，这条命令不会被提交。</p>
+<p>再将3个follower恢复。再发送一条命令（30），这条命令应该被5个节点都接受并apply，且它的index必须是2或3。</p>
+<p>最后再提交一条命令（1000），它也应该被5个节点接受并apply。</p>
+<p>（一开始被断开的3个follower之间会选举出一个新leader（称保留在集群中的leader为老leader），在它们返回集群时，两个leader将会比对各自的term，term高的人成为集群最终的leader，如果新leader的term大（不发生故障情况），那么命令（30）的index应该是2；如果老leader的term大，那么命令（30）的index应该是3）</p>
+<p>测试6：TestConcurrentStarts2B</p>
+<p>使用3个节点，连续快速地发送五个命令（100~104）到集群中，然后查看它们被apply的顺序和Start时返回的次序是否相同，简而言之就是它们能否被顺序提交。</p>
+<p>测试7：TestRejoin2B</p>
+<p>使用3个节点，设它们为A，B，C，假设A最先成为leader，向集群提交了第一个命令（101），它应该被所有节点接收并apply</p>
+<p>断开A，然后向A发送3个命令（102，103，104），由于只有A得到了这3个命令，所以它们不会被提交</p>
+<p>A断开后，B与C中选出一个新的leader，这里假设是B，向B发送命令（103），B与C都将接受并apply它</p>
+<p>断开B，恢复A，这时在集群中的是A和C，由于选举限制，C会成为leader（必定），然后向C发送命令（104），A与C都会接受并apply它，同时C会对A的日志进行调整。（这时A的日志内容为{101，103，104}）</p>
+<p>恢复B，最后发送一条命令（105）到集群中，它将所有节点接受并apply</p>
+<p>测试8：TestBackup2B</p>
+<p>（这一个测试的命令内容都由随机数生成，但是在debug的时候建议把它们改成固定的数值，否则由于生成随机数都非常大，在打印日志的时候会眼花缭乱）</p>
+<p>使用5个节点，假设为A，B，C，D，E，假设A先成为leader，首先发送一条命令（随机数生成，但这里使用我指定的数方便说明），命令（0）</p>
+<p>断开C，D，E，向保留在集群中的A与B发送50条命令（-1~-50），由于只有两个节点接受到这50条命令，所以它们不会被提交</p>
+<p>将A，B断开，C，D，E恢复，假设恢复后C成为了新的leader，向C，D，E发送50条命令（1~50），这些命令会被C，D，E提交</p>
+<p>将D断开，向剩下的C，E发送50条命令（-51~-100），只有两个节点收到这50条命令，所以它们不会被提交</p>
+<p>将剩下的节点都断开，恢复A，B，D，然后D会成为leader（选举限制），向A，B，D发送50条命令（51~100），这些命令会被A，B，D提交</p>
+<p>将所有节点连接到集群中，发送一条命令（200），它会被全部节点提交</p>
+<p><strong>易错情况:</strong></p>
+<p>在Rejoin和Backup都可能出现一种很麻烦的情况。以Backup为例，在最后所有节点恢复后，假设A为leader（由于选举限制，只有ABD可能成为leader），这时log[A]={0，1，2，…，50，51，52，…，100}，那么它的commitIdex=101</p>
+<p>在C恢复时，log[C]={0，1，2…，50，-51，-52，…，-100}，它的commitIndex=51</p>
+<p>C在恢复后会接受到A发送的第一次<strong>心跳(不会把leader的log给follower，只会检查prevlog并且更新commitIndex）</strong>，由于保存在A中的nextIndex[C]&lt;51（即使不是，也会因为nextIndex一直回退，最终变成这样），则prevLog检测正确，<strong>C会根据A的commitIndex更新自己的commitIndex</strong>，然后C的commitIndex=101</p>
+<p>之后C就会将本不应该被提交的命令（-50~-100）提交，从而造成“commit index=52 server=C -51 != serverA 51”的错误</p>
+<p>造成这个错误最大的原因就是对于重返集群的节点，心跳只会检测prevLog而不会检测整个Log是否与当前leader同步（因为心跳不会传入Log信息），但是心跳又会更新commitIndex（如果在心跳中去除这个功能，前面的测试会出错，造成“one failed to reach argeement”），所以造成了错误。</p>
+<p>一开始想到既然是心跳导致的commitIndex错误更新，那么在心跳中不做commitIndex的更新，只在AppendEntryRPC中更新就行啦！但实际上不行…因为对于最后一条log entry而言，它在被发送给follower后，还需要更新commitIndex才能够apply，但是如果我们只在AppendEntryRPC中更新commitIndex的话，这最后一条log entry的commitIndex就不可能被更新（它是最后一条entry，不会再有AppendEntryRPC发送给follower了）</p>
+<p>我的解决方法是对重返集群的节点增加一个outdate标记，当outdate标记为真时</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F;outdate&#x3D;&#x3D;true</span><br><span class="line">if prevLogIndex &gt; rf.commitIndex&#123;</span><br><span class="line">	rf.commitIndex&#x3D;min(min(prevLogIndex,args.LeaderCommit),rf.lastLogIndex)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>造成错误的原因就是在不一致的条件下更新commitIndex，而在这里我们能保证一致性的就是prevLogIndex及其之前的log，那么我们就用它来更新commitIndex。另一方面，由于HeartBeat会不断改变传入的prevLogIndex的值，所以即使在outdate=true的情况下，follower的commitIndex也会逐步跟上leader（但是效率较低）  </p>
+<p>outdate为假时，就跟原先一样</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F;outdate&#x3D;&#x3D;false</span><br><span class="line">rf.commitIndex&#x3D;min(rf.lastLogIndex,args.LeaderCommit)</span><br></pre></td></tr></table></figure>
+
+<p>那么如何检测重返集群的节点呢？我的做法分为两方面，第一是当节点发现自己的term低于其他节点时，就执行outdate=true；第二是当节点的leaderId=-1（这种情况表示它不知道当前leader是谁），也执行outdate=true</p>
+<p>上述做法可能会将一直在集群中的节点也打上outdate标记，但这并不影响，在outdate标记存在时，follower也可以通过prevLogIndex和leader.commitIndex来更新自己的commitIndex</p>
+<p>appendEntriesRPC</p>
+<p>测试9：TestCount2B</p>
+<p>这个测试主要是要求RPC的使用次数不能太多，只要election timeout正确，不产生太多选票瓜分，并且心跳间隔符合要求就能通过。</p>
+<p>Part C</p>
+<p>集群中的节点随时可能crash, 所以我们将一些数据: Log，currentTerm， votedFor，主要编写readPersist和persist方法。在Make方法被调用时立即恢复之前持久化保存的数据。</p>
+<p>在Log，currentTerm，votedFor这几个需要持久化的数据改变时调用persist方法更新数据，在Make方法中使用readPersist读取持久化的数据</p>
+<p>后续几个关于Figure8和Unreliable的测试主要是在2B的基础上完善逻辑，如果之前写的程序逻辑没问题，其实就可以直接通过。</p>
+<p>唯一要注意的一点是，<strong>在AppendEntryRPC中需要加入一个优化，否则有一个测试点会一直卡着过不去。</strong></p>
+<p>详细优化情况参照<a target="_blank" rel="noopener" href="https://thesquareplanet.com/blog/students-guide-to-raft/">https://thesquareplanet.com/blog/students-guide-to-raft/</a></p>
+<p>这是MIT6.824某个助教写的guide，里面记录了一些大多数学习者都会遇到的corner case及其解决方法，大家如果在哪里卡住了可以参照一下</p>
+<p>为了大家方便，我直接将其中有关2C的优化点给截图下来。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/EMDCBAQRLLWOL7AUJPGYT.png"></p>
+<p>LAB 2C 有关AppendEntryRPC内部的优化点</p>
+<p>当我们在AppendEntryRPC中发现Leader传入的prevLog和follower冲突时，我们就会返回，并在leader中回退prevLogIndex，我们原先的做法就是一次回退一步；但是这样会比较慢，如果leader和follower的Log之间差异过大的话，我们需要发送多次AppendEntry来回退prevLogIndex。为了加速回退过程，我们在每次回退的时候，可以回退到上一个term提交的log处，具体的处理方式在上图中说的比较详细。</p>
+<p>总结</p>
+<p>在做lab2的时候才真正感受到了分布式系统debug真是太痛苦了，我这个菜鸡就只能用print把状态信息打出来慢慢分析，甚至有些错误是概率性发生的，这跟单机调试完全不一样。但是在完成了这个实验之后也很有成就感。（虽然程序还有很多date race，以后有时间在改把= =）</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/01/23/mapreduce%E8%AF%BB%E4%B9%A6%E7%AC%94%E8%AE%B0/" rel="prev" title="Mapreduce读书笔记">
+      <i class="fa fa-chevron-left"></i> Mapreduce读书笔记
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/03/12/mit6-824-lab3-kvraft/" rel="next" title="MIT-6.824-lab3A-kvraft">
+      MIT-6.824-lab3A-kvraft <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="wwow"
+      src="/uploads/avatar.png">
+  <p class="site-author-name" itemprop="name">wwow</p>
+  <div class="site-description" itemprop="description">努力不一定会成功，但不努力真的很舒服</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">19</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">wwow</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

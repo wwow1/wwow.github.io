@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.1.1">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"yoursite.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="5438.制作m束花所需的最少天数给你一个整数数组 bloomDay，以及两个整数 m 和 k 。 现需要制作 m 束花。制作花束时，需要使用花园中 相邻的k朵花 。 花园中有 n 朵花，第 i朵花会在 bloomDay[i] 时盛开，恰好 可以用于 一束 花中。 请你返回从花园中摘 m 束花需要等待的最少的天数。如果不能摘到 m 束花则返回 -1 。 示例 1： 输入：bloomDay &#x3D; [1">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Leetcode周赛 6.14">
+<meta property="og:url" content="http://yoursite.com/2020/06/16/leetcode%E5%91%A8%E8%B5%9B-6-14/index.html">
+<meta property="og:site_name" content="wwow&#39;s blog">
+<meta property="og:description" content="5438.制作m束花所需的最少天数给你一个整数数组 bloomDay，以及两个整数 m 和 k 。 现需要制作 m 束花。制作花束时，需要使用花园中 相邻的k朵花 。 花园中有 n 朵花，第 i朵花会在 bloomDay[i] 时盛开，恰好 可以用于 一束 花中。 请你返回从花园中摘 m 束花需要等待的最少的天数。如果不能摘到 m 束花则返回 -1 。 示例 1： 输入：bloomDay &#x3D; [1">
+<meta property="og:locale">
+<meta property="article:published_time" content="2020-06-16T09:21:01.000Z">
+<meta property="article:modified_time" content="2020-08-30T04:00:00.687Z">
+<meta property="article:author" content="wwow">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://yoursite.com/2020/06/16/leetcode%E5%91%A8%E8%B5%9B-6-14/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-Hans'
+  };
+</script>
+
+  <title>Leetcode周赛 6.14 | wwow's blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">wwow's blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/06/16/leetcode%E5%91%A8%E8%B5%9B-6-14/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/uploads/avatar.png">
+      <meta itemprop="name" content="wwow">
+      <meta itemprop="description" content="努力不一定会成功，但不努力真的很舒服">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="wwow's blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Leetcode周赛 6.14
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-06-16 17:21:01" itemprop="dateCreated datePublished" datetime="2020-06-16T17:21:01+08:00">2020-06-16</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-08-30 12:00:00" itemprop="dateModified" datetime="2020-08-30T12:00:00+08:00">2020-08-30</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E7%AE%97%E6%B3%95/" itemprop="url" rel="index"><span itemprop="name">算法</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h3 id="5438-制作m束花所需的最少天数"><a href="#5438-制作m束花所需的最少天数" class="headerlink" title="5438.制作m束花所需的最少天数"></a>5438.制作m束花所需的最少天数</h3><p>给你一个整数数组 bloomDay，以及两个整数 m 和 k 。</p>
+<p>现需要制作 m 束花。制作花束时，需要使用花园中 <strong>相邻的k朵花</strong> 。</p>
+<p>花园中有 n 朵花，第 i朵花会在 bloomDay[i] 时盛开，<strong>恰好</strong> 可以用于 <strong>一束</strong> 花中。</p>
+<p>请你返回从花园中摘 m 束花需要等待的最少的天数。如果不能摘到 m 束花则返回 <strong>-1</strong> 。</p>
+<p><strong>示例 1：</strong></p>
+<p>输入：bloomDay = [1,10,3,10,2], m = 3, k = 1<br>输出：3<br>解释：让我们一起观察这三天的花开过程，x 表示花开，而 _ 表示花还未开。<br>现在需要制作 3 束花，每束只需要 1 朵。<br>1 天后：[x, _, _, _, _]   // 只能制作 1 束花<br>2 天后：[x, _, _, _, x]   // 只能制作 2 束花<br>3 天后：[x, _, x, _, x]   // 可以制作 3 束花，答案为 3</p>
+<p><strong>示例 2：</strong></p>
+<p>输入：bloomDay = [1,10,3,10,2], m = 3, k = 2<br>输出：-1<br>解释：要制作 3 束花，每束需要 2 朵花，也就是一共需要 6 朵花。而花园中只有 5 朵花，无法满足制作要求，返回 -1 。</p>
+<p><strong>示例 3：</strong></p>
+<p>输入：bloomDay = [7,7,7,7,12,7,7], m = 2, k = 3<br>输出：12<br>解释：要制作 2 束花，每束需要 3 朵。<br>花园在 7 天后和 12 天后的情况如下：<br>7 天后：[x, x, x, x, _, x, x]<br>可以用前 3 朵盛开的花制作第一束花。但不能使用后 3 朵盛开的花，因为它们不相邻。<br>12 天后：[x, x, x, x, x, x, x]<br>显然，我们可以用不同的方式制作两束花。</p>
+<p><strong>示例 4：</strong></p>
+<p>输入：bloomDay = [1000000000,1000000000], m = 1, k = 1<br>输出：1000000000<br>解释：需要等 1000000000 天才能采到花来制作花束</p>
+<p><strong>示例 5：</strong></p>
+<p>输入：bloomDay = [1,10,2,9,3,8,4,7,5,6], m = 4, k = 2<br>输出：9</p>
+<p><strong>提示：</strong></p>
+<ul>
+<li>bloomDay.length == n</li>
+<li>1&lt;=n&lt;=10^5</li>
+<li>1&lt;=bloomDay[i]&lt;=10^9</li>
+<li>1&lt;=m&lt;=10^6</li>
+<li>1&lt;=k&lt;=n</li>
+</ul>
+<p>思路:</p>
+<p>这题真的想了非常久，最简单的想法就是按天数递增，每天判断一次是否满足要求，但是一看数据范围就直到这么简单的暴力必然超时。</p>
+<p>然后就想着能不能将bloomDay划分出m个子数组，每个数组含k个元素，最终取出这些子数组内的元素最大值，但是这个思路实现起来很困难，因为m*k&lt;bloomDay.size() （多数情况这个式子是满足的，这样的话我们很难确定划分出的这个子数组是否是正确的。</p>
+<p>假设一组数据 bloomDay=[8,7,6,1,1,1,6,7,8] m=2, k=3</p>
+<p>我们需要从boolmDay数组中划分出2个子数组，每个子数组含3个元素，那么要怎么划分呢？</p>
+<p>直觉上来说应该先划分出[1,1,1]，因为它是最小的</p>
+<p>但是这样结果就是[1,1,1]和[8,7,6] 或是[1,1,1]和[6,7,8]这两种组合，最终结果都是8</p>
+<p>但这一组数据的正确划分应该是[7,6,1]和[1,1,6]，结果是7</p>
+<p>从这个例子可以发现，在划分某个子数组过程中，我们难以判断本次划分是否正确，必须等到我们把全部子数组划分结束后才能得到结果，且这个结果还需要与其他划分方式进行比对，取最小值。</p>
+<p>要枚举出所有划分子数组的方法是必然会超时的</p>
+<p>所以绕了半天好像还是没有越过超时的坎。</p>
+<p>最后我是采用二分的思路解决这题的（大概率不是最优</p>
+<p>步骤如下:</p>
+<p>1.对天数进行二分处理，初始时minday=1，maxday=1e9 （根据1&lt;=bloomDay[i]&lt;=10^9)</p>
+<p>mid=minday+（maxday-minday）/2</p>
+<p>2.在每一次二分过程中判断在mid这一天之前盛开的花是否能够满足我们的需求</p>
+<p>3.如果花的数量满足需要则maxday=mid，如果不满足需要则minday=mid+1，</p>
+<p>4.当minday&gt;=maxday时退出二分循环，这时minday就是我们要找的答案</p>
+<p>这种做法其实也是一种暴力，只是通过二分的思路将时间消耗降低到了可接受范围之内时间复杂度，空间复杂度</p>
+<p>代码</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line">class Solution &#123;</span><br><span class="line">public:</span><br><span class="line">    &#x2F;&#x2F;二分搜索</span><br><span class="line">    int minDays(vector&lt;int&gt;&amp; bloomDay, int m, int k) &#123;</span><br><span class="line">        long long sum&#x3D;m*k;</span><br><span class="line">        int len&#x3D;bloomDay.size();</span><br><span class="line">        if(sum&gt;len) return -1;   &#x2F;&#x2F;m*k&gt;len 花的数量不够</span><br><span class="line">        </span><br><span class="line">        int minday&#x3D;1,maxday&#x3D;1e9;</span><br><span class="line">        while(minday&lt;maxday)&#123;</span><br><span class="line">            int mid&#x3D;minday+(maxday-minday)&#x2F;2;</span><br><span class="line">            int ok&#x3D;false;</span><br><span class="line">            int cal&#x3D;0;</span><br><span class="line">            int tmpm&#x3D;0;</span><br><span class="line">            </span><br><span class="line">            for(int i&#x3D;0;i&lt;len;i++)&#123;  &#x2F;&#x2F;判断这一天是否满足要求</span><br><span class="line">                if(bloomDay[i]&lt;&#x3D;mid)&#123;</span><br><span class="line">                    cal++;</span><br><span class="line">                &#125;</span><br><span class="line">                else</span><br><span class="line">                    cal&#x3D;0;</span><br><span class="line">                if(cal&#x3D;&#x3D;k)&#123;</span><br><span class="line">                    tmpm++;</span><br><span class="line">                    cal&#x3D;0;</span><br><span class="line">                    if(tmpm&#x3D;&#x3D;m)&#123;   &#x2F;&#x2F;满足要求，提前退出循环</span><br><span class="line">                        ok&#x3D;true;</span><br><span class="line">                        break;</span><br><span class="line">                    &#125;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;   </span><br><span class="line">            </span><br><span class="line">            if(ok)</span><br><span class="line">                maxday&#x3D;mid;</span><br><span class="line">            else</span><br><span class="line">                minday&#x3D;mid+1;</span><br><span class="line">        &#125;</span><br><span class="line">        return minday;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/05/27/cmu15-445-%E7%BC%93%E5%86%B2%E6%B1%A0%E5%92%8C%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86/" rel="prev" title="CMU15-445学习笔记-缓冲池和内存管理">
+      <i class="fa fa-chevron-left"></i> CMU15-445学习笔记-缓冲池和内存管理
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/08/30/csapp-bombLab/" rel="next" title="csapp-bomblab">
+      csapp-bomblab <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#5438-%E5%88%B6%E4%BD%9Cm%E6%9D%9F%E8%8A%B1%E6%89%80%E9%9C%80%E7%9A%84%E6%9C%80%E5%B0%91%E5%A4%A9%E6%95%B0"><span class="nav-number">1.</span> <span class="nav-text">5438.制作m束花所需的最少天数</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="wwow"
+      src="/uploads/avatar.png">
+  <p class="site-author-name" itemprop="name">wwow</p>
+  <div class="site-description" itemprop="description">努力不一定会成功，但不努力真的很舒服</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">19</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">wwow</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

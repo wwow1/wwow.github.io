@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.1.1">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"yoursite.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="1.介绍 MapReduce是一个用于处理大数据集的编程框架，它能够使没有任何分布式开发经验的程序员也能够使用大型分布式系统来进行数据处理。对于大多数使用者而言，他们只需要根据自己的需要编写MapReduce中的map函数和reduce函数就能够很容易的实现大规模并行化计算，同时MapReduce模型也提供了一定程度的错误处理。 2.编程模型 MapReduce编程模型的原理是：利用一个输入key">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Mapreduce读书笔记">
+<meta property="og:url" content="http://yoursite.com/2020/01/23/mapreduce%E8%AF%BB%E4%B9%A6%E7%AC%94%E8%AE%B0/index.html">
+<meta property="og:site_name" content="wwow&#39;s blog">
+<meta property="og:description" content="1.介绍 MapReduce是一个用于处理大数据集的编程框架，它能够使没有任何分布式开发经验的程序员也能够使用大型分布式系统来进行数据处理。对于大多数使用者而言，他们只需要根据自己的需要编写MapReduce中的map函数和reduce函数就能够很容易的实现大规模并行化计算，同时MapReduce模型也提供了一定程度的错误处理。 2.编程模型 MapReduce编程模型的原理是：利用一个输入key">
+<meta property="og:locale">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/01/OP68GECH8ZVT5PR.jpg">
+<meta property="article:published_time" content="2020-01-23T11:19:57.000Z">
+<meta property="article:modified_time" content="2020-08-30T04:00:10.492Z">
+<meta property="article:author" content="wwow">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/01/OP68GECH8ZVT5PR.jpg">
+
+<link rel="canonical" href="http://yoursite.com/2020/01/23/mapreduce%E8%AF%BB%E4%B9%A6%E7%AC%94%E8%AE%B0/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-Hans'
+  };
+</script>
+
+  <title>Mapreduce读书笔记 | wwow's blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">wwow's blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/01/23/mapreduce%E8%AF%BB%E4%B9%A6%E7%AC%94%E8%AE%B0/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/uploads/avatar.png">
+      <meta itemprop="name" content="wwow">
+      <meta itemprop="description" content="努力不一定会成功，但不努力真的很舒服">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="wwow's blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Mapreduce读书笔记
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-01-23 19:19:57" itemprop="dateCreated datePublished" datetime="2020-01-23T19:19:57+08:00">2020-01-23</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-08-30 12:00:10" itemprop="dateModified" datetime="2020-08-30T12:00:10+08:00">2020-08-30</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/mit6-824/" itemprop="url" rel="index"><span itemprop="name">mit6.824</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>1.介绍</p>
+<p>MapReduce是一个用于处理大数据集的编程框架，它能够使没有任何分布式开发经验的程序员也能够使用大型分布式系统来进行数据处理。对于大多数使用者而言，他们只需要根据自己的需要编写MapReduce中的map函数和reduce函数就能够很容易的实现大规模并行化计算，同时MapReduce模型也提供了一定程度的错误处理。</p>
+<p>2.编程模型</p>
+<p>MapReduce编程模型的原理是：利用一个输入key/value pair集合来产生一个输出的key/value pair集合。MapReduce库的用户用两个函数表达这个计算：Map和Reduce。</p>
+<p>用户编写的map函数得到一个输入的key/value pair，然后产生一系列中间的key/value pair。然后Mapreduce库会将所有具有相同key值的中间value值集合起来传递给reduce函数</p>
+<p>用户编写的reduce函数得到一个输入的key值和一个与key值向对应的value值的集合。reduce函数将这些值合并起来，产生一个较小的value值的集合作为结果（每次reduce调用一般只产生0或1个输出value值)</p>
+<p>3.实现</p>
+<p>3-1执行流程</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/01/OP68GECH8ZVT5PR.jpg"></p>
+<p>1.MapReduce库会将输入数据划分为M份（每份一般为16~64MB，可设置参数调整）然后将会把程序复制到集群中的每一台机器中</p>
+<p>2.在所有机器中，会存在一个Master，而其他机器都被称为worker，Master会为worker分配任务。共有M个map任务以及R个reduce任务需要被分配。master将会为每个空闲的worker分配一个map任务或reduce任务。（worker在一个时刻只能执行一个任务，但每个worker一般需要顺序的执行多个任务）</p>
+<p>3.被分配map任务的worker（称之为 map worker）将会读取对应的输入文件块，它从输入文件块中提取出一个key-value pair集合，并且将这个集合传入用户定义的Map函数。由Map函数产生的中间key-value pair集合将会暂时缓存在内存中</p>
+<p>4.缓存在内存中的中间key-value pair会周期性地被分区函数划分为R份，并将其写入到Map worker的本地磁盘中。这些中间key-value pair的存储地址与长度将会被发送给Master，Master在之后的过程中需要将这些数据的地址发送给reduce worker</p>
+<p>5.当一个worker被Master分配执行reduce任务后（称它为reduce worker），它将通过RPC（远程过程调用）读取存储在map worker磁盘上的中间key-value pair，在将这些数据全部读入后，reduce worker会将这些中间key-value pair根据key值进行一次排序，这样能够便于得到拥有相同key值的中间key-value pair。</p>
+<p>6.在排序后，reduce worker将传递一个key值以及一个与该key值相对应的value集合（这里的key和value都是map函数生成的中间key-value pair中的内容）给用户定义的Reduce函数，Reduce函数的输出将被添加到最终输出文件中（由全局文件系统管理，而不是像map过程一样保存在本地)</p>
+<p>7.当所有map任务和reduce任务完成，Master将唤醒用户程序，这时，MapReduce的调用就结束了。</p>
+<p>3-2 Master的数据结构</p>
+<p>Master中存储了每个map任务以及reduce任务的状态(闲置，处理中，完成)以及每一个worker机器的状态（是否处于空闲状态）</p>
+<p>同时，Master还需要保存Map任务产生的中间key-value pair的保存地址，对于每一个已经完成的map任务而言，Master需要保存该map任务存储数据的R个地址和大小（每一个map任务的输出内容被划分为R份保存)这些被Master保存的地址信息将会被发送到reduce worker</p>
+<p>4.容错</p>
+<p>1.worker故障</p>
+<p>Master会周期性的ping每一个worker，如果在确定的时间内，被ping的worker没有响应则认为这个worker故障了。因为map任务的输出结果是保存在本地的，如果该worker故障了，后续的reduce worker将无法获取需要的中间文件，所以所有被故障worker执行过的map任务需要交由其他worker再次执行。而reduce任务则没有这样的要求，它的输出结果并不是保存在本地。对于故障worker正在执行的任务而言，只需要将这个任务交由其他worker执行就可以了。</p>
+<p>2.Master故障</p>
+<p>周期性的将Master节点的信息保存，如果Master故障了，只需要从内存中copy出一个新的Master就行了。但是在论文中介绍，对于Master节点的故障，原作者采用的是直接结束程序的方法来向使用者反应错误。</p>
+<p>5.数据存储</p>
+<p>（在论文发表时)网络带宽是较为稀缺的资源，也最容易成为MapReduce的性能瓶颈，所以我们希望能够尽量少的使用网络资源，转而尽量使用本地读取的方式提高程序的性能。MapReduce将输入数据划分为多个64MB的blocks，然后将这些blocks以及它们的复制（一般复制3份）保存在构成集群的机器上。MapReduce会将map任务尽量分配给具有对应输入数据(或是存有输入数据复制）的机器上，如果这一点无法做到，它也会将map任务分配到与存有对应输入数据处于同一个交换网络中的其他机器上，尽可能的节约网络带宽资源。</p>
+<p>6.任务粒度</p>
+<p>我们将map阶段分为M份，reduce阶段分为R份。事实上M和R的数值要远大于集群中的机器数量。对于每一个机器而言，它需要执行多个任务来保证负载均衡以及加速在机器故障时系统的恢复速度。</p>
+<p>对于M和R的取值也是有一定标准的，R的取值一般由用户指定，因为每一个reduce任务都会生成一个独立的输出文件。同时在实际的使用时，我们也会选取合适的M使得每一个任务都处理大约16~64MB的数据（这样上述的本地存储优化策略才最有效)，对于R而言，一般将R值设置为集群中worker机器数量的一个小的倍数值。</p>
+<p>7.备用任务</p>
+<p>在map阶段以及reduce阶段即将完成时，时常会出现在执行最后几个任务时消耗了大量时间导致整个程序的执行时间被拖长的情况，这可能由多种原因引起，如磁盘出错。所以MapReduce设置了备用任务，在map阶段或reduce阶段即将结束时，Master会向部分空闲的worker发送还未完成的任务（会导致最后几个未完成的任务由多个worker共同执行），在多个执行相同任务的worker中，只要由一个完成了该任务，则Master视为该任务完成。这样大大提高了MapReduce的执行效率。</p>
+<p>8.使用技巧</p>
+<p>1.分区函数：它被用于划分map函数生成的中间key-value pair，对于缺省的分区函数，会默认使用hash的方法划分中间数据，但用户也可以自己编写分区函数来指定具体的数据划分方式。</p>
+<p>2.顺序保证：在给定的划分中，中间key-value pair将会按照key值递增的方式排序。</p>
+<p>3.合并函数：它的作用是在map worker本地先进行一次中间数据的合并，类似于reduce的作用，合并函数和reduce函数最大的区别是合并函数的输出结果是作为输出文件传递给reduce函数进行后续的处理，而reduce函数的输出会被写入到最终输出文件中。</p>
+<p>（中间略去了几点我没怎么使用到，并且理解不太好的内容）</p>
+<p>4.跳过损坏记录：有时代码中出现了bug导致Map或Reduce函数在执行过程中出错，导致整个MapReduce无法完成。正常来说我们需要先修复bug再运行程序。但有时找出bug需要耗费大量的时间，另一方面也许这个bug在当前阶段是可以接受的。这时MapReduce提供了一种执行模式，在这个模式下MapReduce会检测代码那些部分出错了，并且跳过这一步部分暂不处理。</p>
+<p>在执行Map或Reduce操作前，MapReduce库通过全局变量保存记录序号（我的理解应该就是代码的行列数？）如果用户程序触发了错误，消息处理函数会“用最后一口气”向master发送处理的最后一条记录的序号。当master发现在某个记录出多次失败时，就认为这条记录需要被跳过，在下次重新执行这个任务时会跳过这条记录</p>
+<p>5.本地执行：在分布式系统中调试bug时非常困难的，MapReduce提供了本地版本的库，可以使整个MapReduce过程都在本地计算机上顺序执行，这样用户可以在本地上控制MapReduce操作的执行，能够更好的调试程序。</p>
+<p>6.状态信息：Master可以显示一组状态信息，用户可以监控各种信息。包括了计算执行的进度，例如完成的任务数，正在处理的任务数，处理的百分比等。更进一步的，最顶层的状态页面还会显示那些worker失效了，并显示它们失效时执行的Map和Reduce任务，这些信息在debug时也会提供很大帮助。</p>
+<p>7.计数器：MapReduce库使用计数器统计不同事件的发生次数，例如以及处理的单词数，被索引的文档数等。</p>
+<p>（论文之后的内容主要是MapReduce的性能分析以及一些相关工作的介绍，对于目前的我而言这些内容没有太大意义，并且我认为这些内容直接阅读原论文效果会更好，所以就不整理出来了。）</p>
+<p>9.总结</p>
+<p>MapReduce作为一个编程框架对于没有大规模分布式系统开发经验的使用者是非常友好的，它向使用者隐去了底层分布式系统的细节，用户只需要根据自己的需要填写Map函数和Reduce函数就能够直接开始进行大规模数据的处理，同时，MapReduce也提供了一定的性能优化以及基本的容错机制。对于我这样的分布式系统学习者而言，MapReduce也是一个很好的学习资料能够让我们理解一个分布式系统的运行过程以及构建系统中需要考虑的因素。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/01/22/mit6-824-lab1-mapreduce/" rel="prev" title="MIT-6.824 lab1-mapreduce">
+      <i class="fa fa-chevron-left"></i> MIT-6.824 lab1-mapreduce
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/02/14/mit-6-824-raft%EF%BC%88%E5%AE%9E%E9%AA%8C%E5%86%85%E5%AE%B9%E6%B5%8B%E8%AF%95%E7%94%A8%E4%BE%8B%E8%AE%B2%E8%A7%A3%EF%BC%89/" rel="next" title="MIT-6.824-lab2-raft（实验内容+测试用例讲解）">
+      MIT-6.824-lab2-raft（实验内容+测试用例讲解） <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="wwow"
+      src="/uploads/avatar.png">
+  <p class="site-author-name" itemprop="name">wwow</p>
+  <div class="site-description" itemprop="description">努力不一定会成功，但不努力真的很舒服</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">19</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">wwow</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

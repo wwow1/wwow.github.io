@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.1.1">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"yoursite.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="https:&#x2F;&#x2F;github.com&#x2F;wwow1&#x2F;MIT-6.824 在lab4中，我们将要搭建一个基于分片的kv存储系统，这个系统的工作流程稍微有一点复杂，我看了好几遍说明才看懂- -，同时也参考了一些网上的说明。 简而言之分片（shard）就是将我们要保存的数据分割成多份，然后将这些分片分发给下层的不同个raft集群，每一个raft集群负责多个分片的保存和响应对应的数据操作，同时为了管理这些不">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MIT-6.824-lab4A-The Shard Master">
+<meta property="og:url" content="http://yoursite.com/2020/04/10/mit-6-824-4a-shardmaster/index.html">
+<meta property="og:site_name" content="wwow&#39;s blog">
+<meta property="og:description" content="https:&#x2F;&#x2F;github.com&#x2F;wwow1&#x2F;MIT-6.824 在lab4中，我们将要搭建一个基于分片的kv存储系统，这个系统的工作流程稍微有一点复杂，我看了好几遍说明才看懂- -，同时也参考了一些网上的说明。 简而言之分片（shard）就是将我们要保存的数据分割成多份，然后将这些分片分发给下层的不同个raft集群，每一个raft集群负责多个分片的保存和响应对应的数据操作，同时为了管理这些不">
+<meta property="og:locale">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/04/image-17.png">
+<meta property="article:published_time" content="2020-04-10T14:22:25.000Z">
+<meta property="article:modified_time" content="2020-08-30T04:00:18.435Z">
+<meta property="article:author" content="wwow">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/04/image-17.png">
+
+<link rel="canonical" href="http://yoursite.com/2020/04/10/mit-6-824-4a-shardmaster/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-Hans'
+  };
+</script>
+
+  <title>MIT-6.824-lab4A-The Shard Master | wwow's blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">wwow's blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/04/10/mit-6-824-4a-shardmaster/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/uploads/avatar.png">
+      <meta itemprop="name" content="wwow">
+      <meta itemprop="description" content="努力不一定会成功，但不努力真的很舒服">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="wwow's blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          MIT-6.824-lab4A-The Shard Master
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-04-10 22:22:25" itemprop="dateCreated datePublished" datetime="2020-04-10T22:22:25+08:00">2020-04-10</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-08-30 12:00:18" itemprop="dateModified" datetime="2020-08-30T12:00:18+08:00">2020-08-30</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/mit6-824/" itemprop="url" rel="index"><span itemprop="name">mit6.824</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p><a target="_blank" rel="noopener" href="https://github.com/wwow1/MIT-6.824">https://github.com/wwow1/MIT-6.824</a></p>
+<p>在lab4中，我们将要搭建一个基于分片的kv存储系统，这个系统的工作流程稍微有一点复杂，我看了好几遍说明才看懂- -，同时也参考了一些网上的说明。</p>
+<p>简而言之分片（shard）就是将我们要保存的数据分割成多份，然后将这些分片分发给下层的不同个raft集群，每一个raft集群负责多个分片的保存和响应对应的数据操作，同时为了管理这些不同的raft集群，在多个raft集群之上还需要增加一个用于管理分片和集群配置的raft集群，这个集群称为shardmaster</p>
+<p>大家也许会想问分片是按照什么方法进行分割的呢？我认为具体的方法是由使用者决定的，在lab4中，由于保存的key-value全都是string变量，同时分片数量确定为10个，所以分配规则为 int(key[0])%10</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/04/image-17.png"></p>
+<p>这是我在网上看到的一个非常简单易懂的图片说明，取自<a target="_blank" rel="noopener" href="https://www.jianshu.com/p/6e8d33c3c799">https://www.jianshu.com/p/6e8d33c3c799</a></p>
+<p>在lab4A中，我们只需要完成shardmaster部分，不涉及具体的分片数据管理</p>
+<p>我们主要需要在shardmaster中为上层服务器提供4种服务，分别是</p>
+<p>Join：将新的raft集群加入到配置中，同时需要保证在新raft集群加入后，集群中的分片分配是平均合理的</p>
+<p>Leave：将先前存在于配置中的raft集群排出到集群之外，同样的，在新的集群中也要实现分片分配的平均合理</p>
+<p>Move：将指定的分片分配给指定的某个raft集群</p>
+<p>Query：给定一个配置号，返回对应编号的配置信息，如果配置号为-1或大于存在的所有配置号就返回最新的配置信息</p>
+<p>这4个功能的具体参数和说明都在6.824的网站上有，这里只是简略的说明功能，在实现的时候还是要认真的查看要求和参数</p>
+<p><strong>Client部分</strong></p>
+<p>我们首先开始实现shardmaster的client，shardmaster的client中，对于4个功能的client端的调用已经完善，我们不需要更改，主要是做Clerk的初始化和Clerk变量的添加，这里可以仿照lab3的做法，首先为了防止请求重复执行，我们需要一个opnum来为当前发送的请求加上编号，同时为了支持多client操作，我们需要为每个clerk生成一个clientId。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">type Clerk struct &#123;</span><br><span class="line">	servers []*labrpc.ClientEnd</span><br><span class="line">	opnum int</span><br><span class="line">	mu 		sync.Mutex</span><br><span class="line">	clientId int64</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>Common部分</strong></p>
+<p>然后我们需要修改common.go中的RPC结构变量，只需要在每个–Args中添加Opnum和ClientId就行，非常简单，这里就不贴图了</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">type Config struct &#123;</span><br><span class="line">	Num    int              &#x2F;&#x2F; config number</span><br><span class="line">	Shards [NShards]int     &#x2F;&#x2F; shard -&gt; gid</span><br><span class="line">	Groups map[int][]string &#x2F;&#x2F; gid -&gt; servers[]</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>既然提到了common.go，我们就来说一说配置结构Config，首先Num是用于标识当前的Config编号（从1开始），然后是记录分片所属的Shards数组，Shards数组有10个int值，在我们的lab中，使用到的数据被分为10个分片，而Shards则表示分片号和当前管理它们的集群的集群号gid的映射关系</p>
+<p><strong>Server部分</strong></p>
+<p>最后我们要填写server中的内容，首先是ShardMaster的结构，为了确定Start的log是否apply成功，我们需要加入applyMsg；为了保存每一次apply的结果，需要加入applyCheck；为了保存从头到尾的全部配置信息，我们需要加入configs</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">type ShardMaster struct &#123;</span><br><span class="line">	mu      sync.Mutex</span><br><span class="line">	me      int</span><br><span class="line">	rf      *raft.Raft</span><br><span class="line">	applyCh chan raft.ApplyMsg</span><br><span class="line"></span><br><span class="line">	&#x2F;&#x2F; Your data here.</span><br><span class="line">	applyMsg map[int64]map[int]Msg</span><br><span class="line">	applyCheck map[int64]map[int]Config</span><br><span class="line">	configs []Config &#x2F;&#x2F; indexed by config num</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>首先我们来一一完善Join，Leave，Move，Query这4个RPC</p>
+<p>在lab3中，对于client的RPC请求Get和PutAppend，我们首先将它们start给下层的raft，在raft确保一致性之后，再apply到上层，由上层进行具体apply操作。</p>
+<p>这里也是一样，我们要将这4种请求传入raft，在raft中保证了一致性之后，再回到当前执行它们</p>
+<p>需要确认传入到raft中的结构，在lab3和lab4中都命名为Op</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">type Op struct &#123;</span><br><span class="line">	Operation string   &#x2F;&#x2F;&quot;join&quot; &quot;leave&quot; &quot;move&quot; &quot;query&quot;</span><br><span class="line">	Opnum int</span><br><span class="line">	Args	interface&#123;&#125;</span><br><span class="line">	ClientId int64</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>主要需要说明一个Args，它必须为一个interface{}类型，因为Join，Leave，Move，Query的参数各不相同，只有interface{}才能够接纳它们</p>
+<p>然后在各自函数中将需要使用到的变量打包进入Op，所有内容大致相同，唯一不一样的就是Args，要根据传入的参数来打包</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">func (sm *ShardMaster) Join(args *JoinArgs, reply *JoinReply) &#123;</span><br><span class="line">	Tmp:&#x3D;make(map[int][]string)</span><br><span class="line">	for k,s:&#x3D;range args.Servers&#123;</span><br><span class="line">		Tmp[k]&#x3D;make([]string,len(s))</span><br><span class="line">		copy(Tmp[k],s)</span><br><span class="line">	&#125;</span><br><span class="line">	op:&#x3D;Op&#123;&quot;Join&quot;,args.Opnum,Tmp,args.ClientId&#125;</span><br><span class="line">	tmpReply:&#x3D;sm.StartLog(op)</span><br><span class="line">	reply.WrongLeader&#x3D;tmpReply.WrongLeader</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">func (sm *ShardMaster) Leave(args *LeaveArgs, reply *LeaveReply) &#123;</span><br><span class="line">	op:&#x3D;Op&#123;&quot;Leave&quot;,args.Opnum,args.GIDs,args.ClientId&#125;</span><br><span class="line">	tmpReply:&#x3D;sm.StartLog(op)</span><br><span class="line">	reply.WrongLeader&#x3D;tmpReply.WrongLeader</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">func (sm *ShardMaster) Move(args *MoveArgs, reply *MoveReply) &#123;</span><br><span class="line">	LogArgs:&#x3D;MoveLogArgs&#123;args.Shard,args.GID&#125;</span><br><span class="line">	op:&#x3D;Op&#123;&quot;Move&quot;,args.Opnum,LogArgs,args.ClientId&#125;</span><br><span class="line">	tmpReply:&#x3D;sm.StartLog(op)</span><br><span class="line">	reply.WrongLeader&#x3D;tmpReply.WrongLeader</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">func (sm *ShardMaster) Query(args *QueryArgs, reply *QueryReply) &#123;</span><br><span class="line">	op :&#x3D; Op&#123;&quot;Query&quot;, args.Opnum, args.Num, args.ClientId&#125;</span><br><span class="line">	tmpReply:&#x3D;sm.StartLog(op)</span><br><span class="line">	reply.WrongLeader&#x3D;tmpReply.WrongLeader</span><br><span class="line">	reply.Config&#x3D;tmpReply.Configuration</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在填充了Op结构之后，就将其传入StartLog函数中，这个函数用于统一调用raft.Start函数，StartLog的具体实现基本可以照搬lab3中Get和Append的实现方法。</p>
+<p>之后我们需要编写server中的Apply函数，这里的实现也是基本照搬lab3的内容，实际上思路也差不多，但是不同的是在apply的具体执行时，要跳转到对应的RPChandler函数进行具体的处理</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">if op.Operation&#x3D;&#x3D;&quot;Join&quot;&#123;</span><br><span class="line">	servers:&#x3D;(op.Args).(map[int][]string)</span><br><span class="line">	sm.JoinHandler(servers)</span><br><span class="line">	sm.applyCheck[op.ClientId][op.Opnum]&#x3D;Config&#123;&#125;</span><br><span class="line">	_,ok&#x3D;sm.applyCheck[op.ClientId][op.Opnum]</span><br><span class="line">&#125;else if op.Operation&#x3D;&#x3D;&quot;Leave&quot;&#123;</span><br><span class="line">	GIDs:&#x3D;(op.Args).([]int)</span><br><span class="line">	sm.LeaveHandler(GIDs)</span><br><span class="line">	sm.applyCheck[op.ClientId][op.Opnum]&#x3D;Config&#123;&#125;</span><br><span class="line">&#125;else if op.Operation&#x3D;&#x3D;&quot;Move&quot;&#123;</span><br><span class="line">	moveMsg:&#x3D;(op.Args).(MoveLogArgs)</span><br><span class="line">	sm.MoveHandler(moveMsg)</span><br><span class="line">	sm.applyCheck[op.ClientId][op.Opnum]&#x3D;Config&#123;&#125;</span><br><span class="line">&#125;else if op.Operation&#x3D;&#x3D;&quot;Query&quot;&#123;</span><br><span class="line">	num:&#x3D;(op.Args).(int)</span><br><span class="line">	sm.applyCheck[op.ClientId][op.Opnum]&#x3D;sm.QueryHandler(num)</span><br><span class="line">&#125;else&#123;</span><br><span class="line">	fmt.Println(&quot;unkonwn operation type &quot;+op.Operation)&#125;</span><br><span class="line">&#x2F;&#x2F;Apply中的部分代码</span><br></pre></td></tr></table></figure>
+
+<p>最后我们需要一一编写RPC Handler函数</p>
+<p>我们先从简单的开始，首先是QueryHandler，如果传入的参数num为-1或者大于当前最大的config.num，就返回最后一个config，否则就返回对应下标的config</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">func (sm *ShardMaster) QueryHandler(num int) Config&#123;</span><br><span class="line">	if num&#x3D;&#x3D;-1 || num&gt;&#x3D;len(sm.configs)&#123;</span><br><span class="line">		return sm.configs[len(sm.configs)-1]</span><br><span class="line">	&#125;else&#123;</span><br><span class="line">		return sm.configs[num]</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>然后是MoveHandler函数，首先我们创建一个新的config，然后将上一个config的内容全部复制过来，唯一要改动的就是Shard[args.Shard]要改为指定的args.GID</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">func (sm *ShardMaster) MoveHandler(args MoveLogArgs)&#123;</span><br><span class="line">	lastConfig:&#x3D;len(sm.configs)-1</span><br><span class="line">	newConfig:&#x3D;Config&#123;&#125;</span><br><span class="line">	newConfig.Num&#x3D;lastConfig+1</span><br><span class="line">	newConfig.Groups&#x3D;make(map[int][]string)</span><br><span class="line">	for k,v:&#x3D;range sm.configs[lastConfig].Groups&#123;</span><br><span class="line">		newConfig.Groups[k]&#x3D;make([]string,len(v))</span><br><span class="line">		copy(newConfig.Groups[k],v)</span><br><span class="line">	&#125;</span><br><span class="line">	for i:&#x3D;0;i&lt;NShards;i++&#123;</span><br><span class="line">		if i&#x3D;&#x3D;args.Shard&#123;</span><br><span class="line">			newConfig.Shards[i]&#x3D;args.GID</span><br><span class="line">		&#125;else&#123;</span><br><span class="line">			newConfig.Shards[i]&#x3D;sm.configs[lastConfig].Shards[i]</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line">	sm.configs&#x3D;append(sm.configs,newConfig)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>然后就是比较麻烦的LeaveHandler和JoinHandler，因为它们在更改集群成员的同时，需要对Shards进行再分配，并且要求在移动分片尽量少的情况下保证分片分配的平均。所以我们就需要思考对应的分片分配策略</p>
+<p><strong>LeaveHandler</strong></p>
+<p>1.首先将确定要保留的Group移到新的config中，这些保留的Group所维护的分片不应改变（尽量少移动分片），同时将这些Group计入remainGroupCircle数组（gid数组）中，并使用remainShard（gid-&gt; shard num) 记录它们现在维护的分片数量</p>
+<p>2.根据remainShard的值从小到大给remainGroupCircle数组排序，然后将被移除的Group所维护的分片按照remainGroupCircle中的顺序循环分配给保留的Group们</p>
+<p>稍微解释一下第二个步骤，由于我们确定上一次配置中的分片分配是平均的，所以保留的Group们所负责的分片数量应该是平均的，那么我们只需要将剩余的分片也平均分配就行了。</p>
+<p>但是这里的平均只是相对的，对于10个分片，我们要将它分配给4个Group，那么2（gid100)，2(gid101)，3(gid102)，3(gid103)就是一种较为平均的分配方式，假设gid100退出集群，那么为了维持平均，我们不应该将这两个分片分给gid102和gid103，这将造成2（gid101），4（gid102），4（gid103）这种不平均的局面，而应该优先考虑把分片分配给分配数量最少的gid101，这也是为什么在分配前要根据remainShard排序的原因</p>
+<p><strong>JoinHandler</strong></p>
+<p>1.将新加入的Groups和保留的Groups一起加入新集群，同时记录新加入的Group个数newGroupnum以及保留的Group个数remainGroupnum</p>
+<p>2.计算每个Group现在负责的分片数并保留到数组remainShard（gid-&gt;shard num)，计算出在新的配置中每个集群应负责的分片数量assignShards（只能整除），以及在计算assignShards中由于整除而被“漏网”的分片数leftShards</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">assignShards:&#x3D;NShards&#x2F;(remainGroupnum+newGroupnum)</span><br><span class="line">leftShards:&#x3D;NShards-assignShards*(remainGroupnum+newGroupnum)</span><br></pre></td></tr></table></figure>
+
+<p>3.用remainShard减去assignShards</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F;这段代码与我的实际代码顺序不太一样，但是思路相同</span><br><span class="line">for k,v:&#x3D;range sm.configs[lastConfig].Groups&#123;</span><br><span class="line">   remainShard[k]-&#x3D;assignShards</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这样remainShards的意思就转变为每个Group要分发给新Group的分片数，但这还不准确，还有leftShards要处理，为了实现移动尽量少的分片，所以leftShards我们就保留在旧Group上</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F;根据remainShard逆序排列remainGroup，表示分出分片多的Group应该优先减少分发数</span><br><span class="line"></span><br><span class="line">sort(remainGroup,remainShard,false)</span><br><span class="line">ptr&#x3D;0</span><br><span class="line">for leftShards&gt;0&#123;</span><br><span class="line">	remainShard[remainGroup[ptr]]--</span><br><span class="line">&#x2F;&#x2F;每次自减表示要分出的分片减少1个</span><br><span class="line">	ptr&#x3D;(ptr+1)%len(remainGroup)</span><br><span class="line">	leftShards--</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>4.每个旧Group根据remainShard为新Group循环分发分片，同时也将自己维护的分片信息写入新的配置中</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">for i:&#x3D;0;i&lt;NShards;i++&#123;</span><br><span class="line">	if remainShard[sm.configs[lastConfig].Shards[i]]&gt;0 &amp;&amp; assignShards&gt;0&#123;  &#x2F;&#x2F;为新Group分发分片</span><br><span class="line">		newConfig.Shards[i]&#x3D;newGroup[circlePtr]</span><br><span class="line">		circlePtr&#x3D;(circlePtr+1)%newGroupnum</span><br><span class="line">		remainShard[sm.configs[lastConfig].Shards[i]]--</span><br><span class="line">	&#125;else&#123;   &#x2F;&#x2F;将属于旧Group的分片信息搬运到新配置中</span><br><span class="line">	        newConfig.Shards[i]&#x3D;sm.configs[lastConfig].Shards[i]</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>到此为止，lab4A的内容就结束啦，lab4A的难度还是较低的，因为很多地方的实现都可以仿照lab3A来做，唯一需要思考的应该只有Join和Leave的分片分配策略，接下来我们就要进去6.824的最后一部分lab4B，大家也要做好心理准备哈，4B的难度可就不像4A这么友善了（我太菜了- -</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/04/10/mit-6-824-lab3b-kvraft/" rel="prev" title="MIT-6.824-lab3B-kvraft">
+      <i class="fa fa-chevron-left"></i> MIT-6.824-lab3B-kvraft
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/04/18/mit-6-824-lab4b-sharded-key-value-server/" rel="next" title="MIT-6.824-lab4B-Sharded Key/Value Server">
+      MIT-6.824-lab4B-Sharded Key/Value Server <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="wwow"
+      src="/uploads/avatar.png">
+  <p class="site-author-name" itemprop="name">wwow</p>
+  <div class="site-description" itemprop="description">努力不一定会成功，但不努力真的很舒服</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">19</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">wwow</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

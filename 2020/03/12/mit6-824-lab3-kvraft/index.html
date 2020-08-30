@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.1.1">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"yoursite.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="github地址：https:&#x2F;&#x2F;github.com&#x2F;wwow1&#x2F;MIT-6.824 lab3的任务是在lab2完成的Raft上构建容错的key-value存储服务。本质上就是使用lab3对应的Put，Append，Get命令来维护一个图，但是在维护过程中使用的这三条命令需要通过Raft来保证一致性。 Part A: Key&#x2F;value service without log compactio">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MIT-6.824-lab3A-kvraft">
+<meta property="og:url" content="http://yoursite.com/2020/03/12/mit6-824-lab3-kvraft/index.html">
+<meta property="og:site_name" content="wwow&#39;s blog">
+<meta property="og:description" content="github地址：https:&#x2F;&#x2F;github.com&#x2F;wwow1&#x2F;MIT-6.824 lab3的任务是在lab2完成的Raft上构建容错的key-value存储服务。本质上就是使用lab3对应的Put，Append，Get命令来维护一个图，但是在维护过程中使用的这三条命令需要通过Raft来保证一致性。 Part A: Key&#x2F;value service without log compactio">
+<meta property="og:locale">
+<meta property="article:published_time" content="2020-03-12T03:52:05.000Z">
+<meta property="article:modified_time" content="2020-08-30T04:00:43.013Z">
+<meta property="article:author" content="wwow">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://yoursite.com/2020/03/12/mit6-824-lab3-kvraft/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-Hans'
+  };
+</script>
+
+  <title>MIT-6.824-lab3A-kvraft | wwow's blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">wwow's blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/03/12/mit6-824-lab3-kvraft/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/uploads/avatar.png">
+      <meta itemprop="name" content="wwow">
+      <meta itemprop="description" content="努力不一定会成功，但不努力真的很舒服">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="wwow's blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          MIT-6.824-lab3A-kvraft
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-03-12 11:52:05" itemprop="dateCreated datePublished" datetime="2020-03-12T11:52:05+08:00">2020-03-12</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-08-30 12:00:43" itemprop="dateModified" datetime="2020-08-30T12:00:43+08:00">2020-08-30</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/mit6-824/" itemprop="url" rel="index"><span itemprop="name">mit6.824</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p><a target="_blank" rel="noopener" href="https://github.com/wwow1/MIT-6.824">github地址：https://github.com/wwow1/MIT-6.824</a></p>
+<p>lab3的任务是在lab2完成的Raft上构建容错的key-value存储服务。本质上就是使用lab3对应的Put，Append，Get命令来维护一个图，但是在维护过程中使用的这三条命令需要通过Raft来保证一致性。</p>
+<h3 id="Part-A-Key-value-service-without-log-compaction"><a href="#Part-A-Key-value-service-without-log-compaction" class="headerlink" title="Part A: Key/value service without log compaction"></a>Part A: Key/value service without log compaction</h3><p>在PartA中我们首先需要完善位于kvraft/client.go与kvraft/server.go中的Put，Append，Get三个RPC，Put用于替换数据库中特定键的值，Append用于将值附加到键原先的值上，Get用于获取键的当前值（当一个键不存在时，Append的作用与Put相同）</p>
+<p><strong>client部分:</strong></p>
+<p>第一步是完成client.go中的内容，在client端我们需要编写RPC调用函数，这样client就能通过对应的函数向server发送RPC来进行数据操作。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">type Clerk struct &#123;</span><br><span class="line">	servers []*labrpc.ClientEnd</span><br><span class="line">	opnum int &#x2F;&#x2F;give each operation a num to prevent it from being executed many times</span><br><span class="line">	leaderId  int64</span><br><span class="line">	mu sync.Mutex</span><br><span class="line">	clientId int64</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>以上是我的clerk结构，除了已经给定的servers变量以外，使用opnum记录使用者发送的每一次命令（Put，Append，Get），这样在server端可以通过opnum来辨别该命令是否已经执行（Append命令的重复执行就会导致数据错误）</p>
+<p>leaderId用于记录server节点的leader编号，这样就不需要每一次发送RPC时重复迭代寻找leader。</p>
+<p>mu用于添加互斥锁。clientId为自己的编号，在lab3A中会出现多个client向server发出请求的情况，每一个client的opnum都是从0开始递增，为了防止它们命令的错乱，所以需要clientId来表示client的编号，然后在server处对每一个client的opnum做维护。</p>
+<p><strong>注意点</strong>:在raft中当RPC发送失败时会使用一个循环使它的RPC成功之前重复发送该RPC，在client中我也设置了这样的机制，但是这里需要做一些改动，否则会发生死锁</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">ok:&#x3D;ck.servers[ck.leaderId].Call(&quot;RaftKV.PutAppend&quot;,&amp;args,&amp;reply)</span><br><span class="line">for !ok&#123;</span><br><span class="line">	ck.leaderId&#x3D;nrand()%(int64(len(ck.servers))) &#x2F;&#x2F;partition,the server unreachable</span><br><span class="line">        ok&#x3D;ck.servers[ck.leaderId].Call(&quot;RaftKV.PutAppend&quot;,&amp;args,&amp;reply)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在每一次RPC发送失败后，都需要把leaderId使用随机数(或者用循环迭代）的方式改变，与raft不同，这里使client向server发送RPC请求，但是在partition测试中，会出现某几个server断开的情况，此时如果在每次RPC失败后不充值leaderId，会导致不断向断开的server发送请求，而真正的leader却接受不到请求的死锁</p>
+<p><strong>Server部分:</strong></p>
+<p>第二步我们需要编写server.go中的代码，这一部分主要要完成的内容就是server端的Get和PutAppend的函数，已经对于raft提交的log（也就是Get和Put，Append的请求）的处理。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">type RaftKV struct &#123;</span><br><span class="line">	mu      sync.Mutex</span><br><span class="line">	me      int</span><br><span class="line">	rf      *raft.Raft</span><br><span class="line">	applyCh chan raft.ApplyMsg</span><br><span class="line"></span><br><span class="line">	commitIndex int</span><br><span class="line">	commitTerm int</span><br><span class="line">	maxraftstate int &#x2F;&#x2F; snapshot if log grows this big</span><br><span class="line">	applyNum  map[int64]int &#x2F;&#x2F;记录start调用的命令序列号</span><br><span class="line">	DB map[string]string</span><br><span class="line">	applyMsg map[int64](map[int]Msg)</span><br><span class="line">	applyCheck map[int64]map[int]string</span><br><span class="line">	killCh	chan bool</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">type Msg struct&#123;</span><br><span class="line">	command Op</span><br><span class="line">	index int</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>PutAppend和Get的RPC处理函数的结构是大致相似的，我的函数流程大致为:</p>
+<p>1.调用rf.GetState查看当前server是否leader，如果不是leader就返回</p>
+<p>2.查看applyCheck，如果当前applyCheck[clientId][opnum]的值存在的话说明当前请求已经被执行过了，这时我们只要将执行结果直接返回就行</p>
+<p>3.调用rf.start(op)将log加入raft（这里的op是自定义结构，具体内容由自己填写)并将start返回的index作为CommandIndex保存</p>
+<p>4.设定一个时间（我设置2s），在这一段时间内，不断的循环访问applyMsg[client][opnum]来确认刚才提交的请求是否已经被raft apply并且被server执行。当定时结束后若请求仍未被执行，就将wrongLeader置为true并且返回</p>
+<p>5.在得到applyMsg[clientId][opnum]后，将applyMsg中的成员变量command以及index分别与op和CommandIndex做比较（确定apply的log是我们刚才提交的），如果都相同的话就可以访问applyCheck[clientId][opnum]得到答案返回；如果不是全部相同就将wrongLeader置为true并返回</p>
+<p>最后是Apply部分的内容，这个函数需要在StartKVServer被调用时就开始并发执行，它用于响应raft提交到applyCh中的log（也就是请求），其大致流程:</p>
+<p>1.开启一个循环 for msg:=range kv.applyCh，不断接受applyCh中的log</p>
+<p>2.将msg.Command断言为Op类型 （Command是interface{}，需要断言才能将它认定为Op类型使用）</p>
+<p>3.查询applyCheck[clientId][opnum]，如果它的值存在说明这个请求已经被执行过，直接continue</p>
+<p>4.根据Command.Operation判断请求类型（Get，Put，Append），然后对kv.DB做对应数据操作，如果是Get请求则将结果写入applyCheck[client][opnum]，否则就对applyCheck[client][opnum]写入空串（写入空串和不写不一样）</p>
+<p>5.将Command和msg.Index作为Msg类型变量存入applyMsg[clientId][opnum]，用于判断提交和apply的log是否一致</p>
+<p>以上部分就是lab3A的主要内容和实现思路，在3A部分中的坑其实不多，按照给定的要求来做基本上不会遇到什么坑，但还是要提醒大家一下，在独写成员变量时最后都加上锁来保险，特别是访问applyCheck，applyMsg，DB这几个图结构的时候，如果不加锁很容易造成同步独写导致程序异常。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/02/14/mit-6-824-raft%EF%BC%88%E5%AE%9E%E9%AA%8C%E5%86%85%E5%AE%B9%E6%B5%8B%E8%AF%95%E7%94%A8%E4%BE%8B%E8%AE%B2%E8%A7%A3%EF%BC%89/" rel="prev" title="MIT-6.824-lab2-raft（实验内容+测试用例讲解）">
+      <i class="fa fa-chevron-left"></i> MIT-6.824-lab2-raft（实验内容+测试用例讲解）
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/04/10/mit-6-824-lab3b-kvraft/" rel="next" title="MIT-6.824-lab3B-kvraft">
+      MIT-6.824-lab3B-kvraft <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#Part-A-Key-value-service-without-log-compaction"><span class="nav-number">1.</span> <span class="nav-text">Part A: Key&#x2F;value service without log compaction</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="wwow"
+      src="/uploads/avatar.png">
+  <p class="site-author-name" itemprop="name">wwow</p>
+  <div class="site-description" itemprop="description">努力不一定会成功，但不努力真的很舒服</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">19</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">wwow</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

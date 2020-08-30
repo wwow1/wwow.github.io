@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.1.1">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"yoursite.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="Overview第一节课中我们学到了从使用者的角度如何看待数据库，也学会了如何编写sql语句从数据库中读写数据，在后续的课程里我们将会学习如何构建一个数据库管理软件。 面向磁盘型数据库系统每次我们要访问的数据都不在内存中，我们需要访问磁盘来得到我们需要的数据。在设计我们的软件时，需要设计一系列的组件来保护我们的系统。（有时会出现数据丢失，保存无效或错误数据等情况） 易失型存储和非易失型存储 存储设">
+<meta property="og:type" content="article">
+<meta property="og:title" content="CMU15-445学习笔记-数据库存储part1">
+<meta property="og:url" content="http://yoursite.com/2020/05/14/cmu15-445-%E6%95%B0%E6%8D%AE%E5%BA%93%E5%AD%98%E5%82%A8part1/index.html">
+<meta property="og:site_name" content="wwow&#39;s blog">
+<meta property="og:description" content="Overview第一节课中我们学到了从使用者的角度如何看待数据库，也学会了如何编写sql语句从数据库中读写数据，在后续的课程里我们将会学习如何构建一个数据库管理软件。 面向磁盘型数据库系统每次我们要访问的数据都不在内存中，我们需要访问磁盘来得到我们需要的数据。在设计我们的软件时，需要设计一系列的组件来保护我们的系统。（有时会出现数据丢失，保存无效或错误数据等情况） 易失型存储和非易失型存储 存储设">
+<meta property="og:locale">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/FB4MM@IF@2I_B9@MT1YHAM.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/ZE1C6@BP4J342PH25Q.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/UJE7ZS8Z5TT1UQZEUIBYQ.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/KA0E_UOHB74O8W6U.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/2IJNNGPAORYUWO96.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/KH93RO3Z2AECQ.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/SGCPRH17CE_L1WE14FB7V.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/2HTVS72D7C7ZQIIH8.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/U02JAYPV953_PDTWO@@9.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/JEAMUWX338_T0J8BIPN.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/8ENM9Z_4LQ2L7_PK.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/TUNN@0JKOELI8JGP.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/NPRF6TCDA72@NH8U.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/LM11OC61@NJRMEAWKI.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/RFVXX_R6REBF5ZFZX95M.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/2KDGZA5CZZTWAXS3E.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/1P@DX88OO1QEV8@XH.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/YEHLKACVXJ11GW2S7UV.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/1O01UGBX9N_HWDP5.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/W2I7QUN@CUPCFD8KB.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/OE43Y5@M8XC59V0FJIHY.png">
+<meta property="article:published_time" content="2020-05-14T15:33:41.000Z">
+<meta property="article:modified_time" content="2020-08-30T04:03:57.379Z">
+<meta property="article:author" content="wwow">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/FB4MM@IF@2I_B9@MT1YHAM.png">
+
+<link rel="canonical" href="http://yoursite.com/2020/05/14/cmu15-445-%E6%95%B0%E6%8D%AE%E5%BA%93%E5%AD%98%E5%82%A8part1/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-Hans'
+  };
+</script>
+
+  <title>CMU15-445学习笔记-数据库存储part1 | wwow's blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">wwow's blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/05/14/cmu15-445-%E6%95%B0%E6%8D%AE%E5%BA%93%E5%AD%98%E5%82%A8part1/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/uploads/avatar.png">
+      <meta itemprop="name" content="wwow">
+      <meta itemprop="description" content="努力不一定会成功，但不努力真的很舒服">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="wwow's blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          CMU15-445学习笔记-数据库存储part1
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-05-14 23:33:41" itemprop="dateCreated datePublished" datetime="2020-05-14T23:33:41+08:00">2020-05-14</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-08-30 12:03:57" itemprop="dateModified" datetime="2020-08-30T12:03:57+08:00">2020-08-30</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/cmu15-445/" itemprop="url" rel="index"><span itemprop="name">cmu15-445</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="Overview"><a href="#Overview" class="headerlink" title="Overview"></a>Overview</h2><p>第一节课中我们学到了从使用者的角度如何看待数据库，也学会了如何编写sql语句从数据库中读写数据，在后续的课程里我们将会学习如何构建一个数据库管理软件。</p>
+<h2 id="面向磁盘型数据库系统"><a href="#面向磁盘型数据库系统" class="headerlink" title="面向磁盘型数据库系统"></a>面向磁盘型数据库系统</h2><p>每次我们要访问的数据都不在内存中，我们需要访问磁盘来得到我们需要的数据。在设计我们的软件时，需要设计一系列的组件来保护我们的系统。（有时会出现数据丢失，保存无效或错误数据等情况）</p>
+<h3 id="易失型存储和非易失型存储"><a href="#易失型存储和非易失型存储" class="headerlink" title="易失型存储和非易失型存储"></a>易失型存储和非易失型存储</h3><p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/FB4MM@IF@2I_B9@MT1YHAM.png"></p>
+<p>存储设备层次</p>
+<p>图中虚线上方的存储设备属于易失型存储，而虚线下方的属于非易失型存储，不同存储设备的<strong>访问速度从上到下递减，容量大小从上到下递增</strong>。</p>
+<p>当电源断开时，易失型存储中的数据将会消失，而不能持续的存在。对于存储在易失型存储中的数据，它支持快速随机访问，当以不同顺序访问不同位置的数据的延迟和速度都大致相同。它具有字节可寻址能力，即当我想读取64byte数据时，我也只得到64byte数据，也许大家觉得这理所当然，但是块可寻址的做法并不是这样。同时具有字节一般我们称DRAM中的东西为内存。</p>
+<p>而易失型存储中的数据即使在断电后也能被持久性的保存。对于大部分非易失型存储（如磁盘），它一般支持的是顺序访问，这意味着访问不同位置的数据的延迟和速度会有差异，当读写一段连续的块中的内容时会更有效率，所以我们尽可能希望按序读取数据。另一方面，它不想DRAM一样具有字节可寻址能力，它具备的是块寻址能力，当我们要访问非易失型存储中的数据时，我们得到的一般是数据所在的块或页（可以看作是同一个东西），假如我们只想要64byte的数据，我们也不得不把整个大小为4KB的页读出来。</p>
+<p>在数据库中，我们需要将数据从磁盘（非易失型存储）移动到内存（易失型存储）。</p>
+<p>在图中的分割线处还有一类新的非易失型存储设备（e.g Intel傲腾内存），它像DRAM那样具有字节可寻址能力，又能够在断电后持久性保存数据。目前这种设备还未被大量使用，但是Andy认为它是数据库未来的方向。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/ZE1C6@BP4J342PH25Q.png"></p>
+<p>可以看到不同设备的访问耗时有着巨大的差异，这意味着我们需要最小化从磁盘读取数据的影响，如果我们每次都要从磁盘读取数据，那么数据库的运行效率将十分惨淡。</p>
+<h3 id="系统设计目标"><a href="#系统设计目标" class="headerlink" title="系统设计目标"></a>系统设计目标</h3><p>我们希望在数据库系统中达成的目标是给上层的应用程序一种<strong>错觉</strong>，即我们能够提供足够的内存将整个数据库存入内存中。即我们想要存储的数据库超出了可用内存的大小，但我们不必每次停下去读取或写入某些东西。</p>
+<p>这几节课的内容就是关于如何最小化每次从磁盘读取内容或运行查询时所带来的影响（多线程，缓存，提前计算相关数据）。</p>
+<h3 id="查询过程"><a href="#查询过程" class="headerlink" title="查询过程"></a>查询过程</h3><p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/UJE7ZS8Z5TT1UQZEUIBYQ.png"></p>
+<p>上层的应用向buffer缓存池请求读取page2的内容，这时page2不在内存中，我们再从磁盘的page目录中查找到page2，并将其放入内存缓冲池中，再由buffer将page2的指针提交给上层</p>
+<h3 id="为什么不使用OS"><a href="#为什么不使用OS" class="headerlink" title="为什么不使用OS"></a>为什么不使用OS</h3><p>这个过程像是操作系统中的虚拟内存的工作机制，我们为什么要在数据库中再做这样的内存管理呢？</p>
+<p>在OS的术语中，我们可以使用mmap实现上述机制。如果我们使用OS来帮我们进行内存的管理，这就意味着我们放弃了对数据的直接控制权。OS不关心数据库的行为，它不知道数据库想要做什么，它只知道数据的读写，而不知道高层的语义。这会导致数据库需要使用更多的机制来提示OS的操作，但是我们始终无法完全控制OS完全按照我们的想法行动，这可能会导致许多性能瓶颈。</p>
+<p>许多数据库都使用了mmap（levelDB,mongoDB，memSQL，SQLite），但它们大多数在发展过程中都逐渐摆脱了mmap，因为使用OS做内存管理会导致许多限制和性能瓶颈。（We known that Andy hate mmap）</p>
+<p>而数据库明白查询的语义，它知道工作负载如何，它能够根据这些做出最佳选择，但OS不知道这些，它只知道一些底层的读写调用。OS就像一辆通用卡车，但我们能够像保时捷法拉利那样调整我们的系统，来做到更好的定制化，</p>
+<h3 id="如何用磁盘上的文件表示数据库"><a href="#如何用磁盘上的文件表示数据库" class="headerlink" title="如何用磁盘上的文件表示数据库"></a>如何用磁盘上的文件表示数据库</h3><h3 id="如何将页存储在文件中"><a href="#如何将页存储在文件中" class="headerlink" title="如何将页存储在文件中"></a>如何将页存储在文件中</h3><p>数据库就是磁盘上的一堆文件。对于OS而言，它不知道这里面有什么，这只是一堆普通的二进制文件。但是这些数据文件的格式通常都是专用于某个数据库管理系统的，我们无法将SQLite文件导入mySQL中，反之亦然。</p>
+<p>我们通常将文件存放在OS提供的文件系统中（Ex3，Ex4），我们使用文件系统的读写API对文件进行读写（提高数据库的可移植性和降低开发复杂度）。</p>
+<h4 id="存储管理器"><a href="#存储管理器" class="headerlink" title="存储管理器"></a>存储管理器</h4><p>我们的课程lab将会构建一个存储管理器（存储引擎），它负责维护磁盘上的数据库文件，我们将这些文件组织为一个page的集合，我们的存储管理器将会跟踪在这些page上的所有读写操作。</p>
+<h4 id="数据库page"><a href="#数据库page" class="headerlink" title="数据库page"></a>数据库page</h4><p>一个page就是一个固定大小的数据块，我们将文件组织为这些块，它能够存储各种东西（数据，索引，日志，元数据），但是有些数据库要求page必须是self-contained的，即page中的所有信息你都需要知道如何去理解和解释。</p>
+<p>举例说，我有一张表，我将表的元数据存入一个page，而表的所有tuple存入另一个page，但是现在磁盘烧了，存储元数据的那个page丢失了，那么我就无法解释存储tuple的那个page，我们不知道这里面的数据是什么。所以我们应该将元数据和tuple应该存放在一起，这样就满足了self-contained。</p>
+<p>所以self-contained特性能够保证即使丢失了一个page，也不会影响其他page，许多系统通过它来进行容灾恢复。</p>
+<p>每个page会被赋予一个唯一的内部标识符，我们会有一个indirection层来将一个pageID映射到集合中一个文件的某个位置（记录一个相对位置，当文件整体移动后，我们只需要知道文件的起始位置，就可以通过pageID得到数据对应的位置，因为页的大小是固定的，id*页的大小就能够得到offset）</p>
+<p>我们需要明确数据库中讲的page和OS以及硬件层的page不完全相同。</p>
+<p>对于硬件层和OS来说，一个page的大小一般为4KB，但数据库中page的大小是可调整的（512B~16KB），需要注意的是由于硬件层的page大小为4KB，这意味这当我对磁盘进行写入和刷新时，存储设备只能保证每次写入4KB时原子性的。</p>
+<p>这就容易造成一个问题 例如我们将一个16KB的数据库page回写到磁盘 但是OS在写入前8KB后故障了 这个时候它并不会回滚，它只会继续把剩下8kb继续写入磁盘，这样会导致这16kb的数据被分裂成两部分，我们就不能使用了</p>
+<h4 id="page存储架构"><a href="#page存储架构" class="headerlink" title="page存储架构"></a>page存储架构</h4><p>不同DBMS使用不同的方式管理磁盘上的page</p>
+<h5 id="Heap-file-organization"><a href="#Heap-file-organization" class="headerlink" title="Heap file organization"></a>Heap file organization</h5><p>数据库中的heap文件是一个page的<strong>无序</strong>集合，即随机地把tuple存在其中，当我们将tuple一个接一个地插入，不能保证在磁盘的顺序和插入的顺序相同。</p>
+<p>我们需要使用一些元数据来跟踪page，知道哪些page是空闲的，这样我们就可以将数据插入到空闲的page中。</p>
+<p>我们可以通过不同的方式表示heap文件。</p>
+<p>1.链表</p>
+<p>我们需要在heap文件的头部中维护两个链表，一个是指向空闲page的链表，另一个是指向已保存数据page的链表。每次我们要插入数据的时候就在空闲page的链表中遍历查找一个大小合适的page来保存插入的数据。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/KA0E_UOHB74O8W6U.png"></p>
+<p>2.page目录</p>
+<p>page目录一样存放在heap文件的头部中，它里面维护了pageID和它们位置的映射关系，我们也可以在其中维护一些额外的元信息，例如每个page的空闲空间，当我想要插入一些数据的时候，我们就可以在page字典中查找到对应的page存放数据。</p>
+<p>（类似hash Table）</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/2IJNNGPAORYUWO96.png"></p>
+<p>page目录</p>
+<p>这时我们会遇到一些关于原子性操作的问题，当我们删除了一些数据和page，我们也需要修改page目录中的信息，表示这个page现在有空闲的空间了。但是这个过程不能保证是原子性的，有可能在我们修改page目录中的信息前，系统崩溃了，当系统恢复正常时，page目录中仍显示哪些我们已经删除数据的page是满的，但实际上它已经变成空闲的了。</p>
+<p>也许我们可以在系统恢复后，对所有page进行一次扫描并更新对应的page目录信息。但在数据库中信息量非常大的情况（1PB），这个工作就显得不太可能完成。</p>
+<p>我们后续会讨论采用一些机制来维护日志和初始的元数据，在系统崩溃后，我们仍然可以正确的恢复它。</p>
+<p>（Q1：为什么数据库的page大小要设置的比OS和硬件层更大？</p>
+<p>A1：这是一种权衡，在数据库内部，我们使用内存中的page目录来映射page的位置。如果我们使用更大的page，那么我们使用的pageID就更少，相应的page目录就更小，类似CPU中的TLB（页表缓存）；如果page设置的小，那么page目录就会变得很大，那么它就难以存放在高速缓存或是内存中。</p>
+<p>我们可以讨论一下随机访问和顺序访问的问题，如果我们的数据库page是16KB，我们可以连续写出4个4KB的page（OS意义的page）来表示它，这其实一定程度上用到了顺序访问的特点。但是我们在写入的时候也需要增加许多机制来防止由于原子性导致的数据错误。所以不同的做法各有优缺点，这也是许多商业数据库允许你根据自己的需要调整数据库的原因。）</p>
+<p>（Q2：如果使用self-contained page，是否能够解决上述的原子性问题？</p>
+<p>A2：不行，因为对于self-contained page，它只是表示元数据和tuple放在同一个数据page中。我们在修改数据时，一定需要做修改数据page和修改目录page这两步操作，原子性的问题并没有解决。）</p>
+<h5 id="page头部"><a href="#page头部" class="headerlink" title="page头部"></a>page头部</h5><p>每一个page中都有一个包含元数据的头部，头部中的数据一般包括：</p>
+<p>1.page大小</p>
+<p>2.Checksum（使用CRC,md5来检验出错）</p>
+<p>3.数据库管理系统版本</p>
+<p>4.transaction visibility（目前不太了解，就不翻译了)</p>
+<p>5.compression information（同上）</p>
+<h5 id="page布局"><a href="#page布局" class="headerlink" title="page布局"></a>page布局</h5><p>对于任何page存储架构，我们需要理解如何在page内部存储和组织数据</p>
+<p>我们可以通过两种方式表示一个page中的数据：(我们假设目前只存储tuple)</p>
+<p>1.Tuple-oriented；2.log-structured</p>
+<p>我们现在来看一看page内部是怎样的。</p>
+<p><strong>Tuple-oriented</strong></p>
+<p>首先来看一看最简单的一种做法</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/KH93RO3Z2AECQ.png"></p>
+<p>我们在page的头部中记录一个TupleNum，它表示目前存储的tuple的数量，每次插入一个新的tuple，我们就根据TupleNum来计算偏移量，将新的tuple插入到最后。</p>
+<p>但是这么做很蠢，因为当我们要在中间删除一个tuple的时候，我们要将在它之后的大量tuple都向前移。</p>
+<p>也许我们可以不必移动后面的tuple，而是将新的tuple插入到这个空位就行了，但这仍然不好，因为我们要存储的tuple可能是不定长的，可能这个空位不够大，无法容纳新的tuple。另一方面，这种做法要求我们在头部维护一个空位信息来告诉新插入的tuple，哪些位置是空位。</p>
+<p>我们介绍一种更加通用的page存储策略：<strong>slotted page</strong></p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/SGCPRH17CE_L1WE14FB7V.png"></p>
+<p>首先在page的头部保存一些基本的元数据（checksum，访问时间等），并且我们有一个slot数组，它将一个特定的slot映射到page内的一个偏移量。而数据存储部分则在page的最后部分。我们可以通过查找slot数组来得到tuple的偏移量，并进一步查找得到数据。当tuple移动时，只需要更新slot数组的对应值就行。这样，当我们要查找一条tuple时，我们可以使用pageID和slot number来定位它。</p>
+<p>我们填充page的方式是从前往后对slot数组进行填充，而数据则是从后向前填充（如图所示，对于tuple1而言，我们从page结束位置开始，减去tuple1的大小，这样就得到了tuple1的起始偏移量，并将它存到slot数组中），当我们的数据占用了page的一半大小时，将认为这个page已满，这样可能会留下一些空隙，但我们为了支持可变大小的tuple，不得不这么做。</p>
+<p>（Q3：我怎么知道tuple1是存在slot1中的？</p>
+<p>A3：我们识别tuple的方式是使用tupleId或recordId，它是一个用来表示一个tuple的逻辑地址，一般是由pageId加上offset或是slot来表示。</p>
+<p>Andy分别使用PostgreSQL，SQLite，Oracle来展示不同的数据库如何定位一个tuple。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/2HTVS72D7C7ZQIIH8.png"></p>
+<p><strong>首先是PostgreSQL的例子</strong>，它使用属性ctid来定位不同tuple，（0，1）表示该tuple位于page0，slot1的位置</p>
+<p>当我们删除id=102的tuple后得到下图的结果。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/U02JAYPV953_PDTWO@@9.png"></p>
+<p>可以看到slot2被清空了，那么考虑一下如果这时我们再插入新的tuple，新的tuple会放在slot2还是slot4？</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/JEAMUWX338_T0J8BIPN.png"></p>
+<p>答案是新的tuple会放在slot4（这只是代表PostgreSQL的做法）</p>
+<p>在PostgreSQL中有一个类似于GC的东西，叫做vaccum，它会遍历所有page，并对它们进行整理，当它发现空闲空间，它会对这些page进行压缩。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/8ENM9Z_4LQ2L7_PK.png"></p>
+<p>这是我们执行vaccum后的结果，可以看到id=103的tuple被移动到slot2的空位上，后面的id=104的tuple也向前紧凑。</p>
+<p><strong>接下来看看在SQL server中是如何定位一个tuple</strong></p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/TUNN@0JKOELI8JGP.png"></p>
+<p>SQL中使用File：Page：Slot这个属性清晰的告诉我们tuple的位置。</p>
+<p>然后我们将第二条tuple删去，得到下图的结果。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/NPRF6TCDA72@NH8U.png"></p>
+<p>再插入一条新的tuple看看，对于SQL server而言，它会将新的tuple放在哪个Slot。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/LM11OC61@NJRMEAWKI.png"></p>
+<p>从上图中看到，SQL server在更新pserverage时，它一旦发现了page中存在可用的空隙，那么它会将page做紧凑处理，然后再将数据写出到page上。所以我们会看到id=103的tuple从slot2被移动到slot1，而新插入的id=104的tuple被放在slot2。</p>
+<p><strong>最后我们看看Oracle的做法</strong></p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/RFVXX_R6REBF5ZFZX95M.png"></p>
+<p>Oracle使用rowID来定位tuple，但是显然rowID的数据我们看不懂，我们可以添加命令对他进行翻译，得到OBJID,FILENUM,BLOCKNUM,ROWSLOT这几项属性。</p>
+<p>同样的，我们删去ID=102的tuple。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/2KDGZA5CZZTWAXS3E.png"></p>
+<p>最后插入一条ID=104的tuple。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/1P@DX88OO1QEV8@XH.png"></p>
+<p>结果和PostgreSQL相似，新插入的tuple被放在了Slot3上，而不是存在空位的Slot1。</p>
+<p>上面三个例子是不同数据库表示内部tuple的方法，SQL server会在我们写入数据时进行压缩，而PostgreSQL和Oracle则是把空的slot放在那里不管它。不同的数据库系统做不同的事情，这只是系统内部组织page的tuple的方法，它并不会影响系统的其他部分。</p>
+<p>）</p>
+<h3 id="页中的tuple是怎样的"><a href="#页中的tuple是怎样的" class="headerlink" title="页中的tuple是怎样的"></a>页中的tuple是怎样的</h3><h3 id="tuple布局"><a href="#tuple布局" class="headerlink" title="tuple布局"></a>tuple布局</h3><p>对我们而言，tuple是一串字节，当我们取得了slot偏移量，我们向对应的位置写入一些字节，这就足够了。</p>
+<p>但对于数据库而言，它需要能够解释这一串字节的实际含义。这也是我们需要有scheme的原因，scheme会记录不同属性的类型，这样我们可以知道tuple的大小，并进一步跳转到不同的偏移量处得到我想要的tuple。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/YEHLKACVXJ11GW2S7UV.png"></p>
+<p>上图是tuple的结构，在一个tuple内我们也需要一个头部来追踪不同的信息，例如哪一个事务查询修改了它，以及null值的位图。</p>
+<p>通常情况下，我们不需要将tuple的元数据（这个tuple有几列，不同属性的类型等）保存在tuple内部。我们将这些高级的元数据保存在这个page里（整个page都存储同一个表的tuple）。</p>
+<p>但是对于支持JSON和scheme的数据库（MongoDB），我们需要将元数据写在tuple内部，因为每一条tuple和记录都可能不同，所以我们要保存与其实际内容相关的元数据。</p>
+<h4 id="不同表的数据保存在同一个page"><a href="#不同表的数据保存在同一个page" class="headerlink" title="不同表的数据保存在同一个page"></a>不同表的数据保存在同一个page</h4><p>大多数情况下，我们为了让page变得独立，我们不会想将不同表的tuple保存在同一个page中，这样我们不得不保存一大堆属于不同表的元数据。</p>
+<p>在某些情况下，我们希望将一张表嵌入另一张表中，我们会使用join操作将不同的表进行内联，这时，我们可以将不同表的数据放在同一个page中。</p>
+<p>举例来说，如下图所示，我们有foo和bar两个table，它们使用一个外键相关联。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/1O01UGBX9N_HWDP5.png"></p>
+<p>通常情况下，我们会将这两张表分开保存在不同page中（如下图）</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/W2I7QUN@CUPCFD8KB.png"></p>
+<p>但是当我们想将两张表进行join操作时，我们会将bar的tuple直接内嵌在foo的tuple中，这样它们就被存放在同一个page中。（如下图）</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/OE43Y5@M8XC59V0FJIHY.png"></p>
+<p>这被称为反范式化，在内部我们会以这样的方式存储我们的page，在应用程序看来，它里面有两张相同的表，但在内部，我们的page实际上将它们合并到一起了。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>数据库是通过page组织数据的</p>
+<p>我们使用不同的方式来跟踪文件中的page</p>
+<p>我们使用不同方式来存储page</p>
+<p>在page中，我们可以用不同的方式存储tuple</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/04/18/mit-6-824-lab4b-sharded-key-value-server/" rel="prev" title="MIT-6.824-lab4B-Sharded Key/Value Server">
+      <i class="fa fa-chevron-left"></i> MIT-6.824-lab4B-Sharded Key/Value Server
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/05/20/cmu15-445-%E6%95%B0%E6%8D%AE%E5%BA%93%E5%AD%98%E5%82%A8part2/" rel="next" title="CMU15-445学习笔记-数据库存储part2">
+      CMU15-445学习笔记-数据库存储part2 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Overview"><span class="nav-number">1.</span> <span class="nav-text">Overview</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%9D%A2%E5%90%91%E7%A3%81%E7%9B%98%E5%9E%8B%E6%95%B0%E6%8D%AE%E5%BA%93%E7%B3%BB%E7%BB%9F"><span class="nav-number">2.</span> <span class="nav-text">面向磁盘型数据库系统</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%98%93%E5%A4%B1%E5%9E%8B%E5%AD%98%E5%82%A8%E5%92%8C%E9%9D%9E%E6%98%93%E5%A4%B1%E5%9E%8B%E5%AD%98%E5%82%A8"><span class="nav-number">2.1.</span> <span class="nav-text">易失型存储和非易失型存储</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%B3%BB%E7%BB%9F%E8%AE%BE%E8%AE%A1%E7%9B%AE%E6%A0%87"><span class="nav-number">2.2.</span> <span class="nav-text">系统设计目标</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%9F%A5%E8%AF%A2%E8%BF%87%E7%A8%8B"><span class="nav-number">2.3.</span> <span class="nav-text">查询过程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E4%BD%BF%E7%94%A8OS"><span class="nav-number">2.4.</span> <span class="nav-text">为什么不使用OS</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A6%82%E4%BD%95%E7%94%A8%E7%A3%81%E7%9B%98%E4%B8%8A%E7%9A%84%E6%96%87%E4%BB%B6%E8%A1%A8%E7%A4%BA%E6%95%B0%E6%8D%AE%E5%BA%93"><span class="nav-number">2.5.</span> <span class="nav-text">如何用磁盘上的文件表示数据库</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A6%82%E4%BD%95%E5%B0%86%E9%A1%B5%E5%AD%98%E5%82%A8%E5%9C%A8%E6%96%87%E4%BB%B6%E4%B8%AD"><span class="nav-number">2.6.</span> <span class="nav-text">如何将页存储在文件中</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%AD%98%E5%82%A8%E7%AE%A1%E7%90%86%E5%99%A8"><span class="nav-number">2.6.1.</span> <span class="nav-text">存储管理器</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E5%BA%93page"><span class="nav-number">2.6.2.</span> <span class="nav-text">数据库page</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#page%E5%AD%98%E5%82%A8%E6%9E%B6%E6%9E%84"><span class="nav-number">2.6.3.</span> <span class="nav-text">page存储架构</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#Heap-file-organization"><span class="nav-number">2.6.3.1.</span> <span class="nav-text">Heap file organization</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#page%E5%A4%B4%E9%83%A8"><span class="nav-number">2.6.3.2.</span> <span class="nav-text">page头部</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#page%E5%B8%83%E5%B1%80"><span class="nav-number">2.6.3.3.</span> <span class="nav-text">page布局</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%A1%B5%E4%B8%AD%E7%9A%84tuple%E6%98%AF%E6%80%8E%E6%A0%B7%E7%9A%84"><span class="nav-number">2.7.</span> <span class="nav-text">页中的tuple是怎样的</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#tuple%E5%B8%83%E5%B1%80"><span class="nav-number">2.8.</span> <span class="nav-text">tuple布局</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%B8%8D%E5%90%8C%E8%A1%A8%E7%9A%84%E6%95%B0%E6%8D%AE%E4%BF%9D%E5%AD%98%E5%9C%A8%E5%90%8C%E4%B8%80%E4%B8%AApage"><span class="nav-number">2.8.1.</span> <span class="nav-text">不同表的数据保存在同一个page</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">3.</span> <span class="nav-text">总结</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="wwow"
+      src="/uploads/avatar.png">
+  <p class="site-author-name" itemprop="name">wwow</p>
+  <div class="site-description" itemprop="description">努力不一定会成功，但不努力真的很舒服</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">19</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">wwow</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

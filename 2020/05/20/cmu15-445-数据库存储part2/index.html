@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.1.1">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"yoursite.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="面向磁盘型数据库系统page布局log-structured上节课我们在讲到page布局时说到了tuple-oriented的方式，使用slotted page的方法将每一个tuple对应的偏移量保存在slot中，这样就能在定位到tuple在page内部的位置。这节课将会补充说明另外一种log-structured方法。 这种组织方式不是将所有tuple存放在page内，而是去存储这些与创建tup">
+<meta property="og:type" content="article">
+<meta property="og:title" content="CMU15-445学习笔记-数据库存储part2">
+<meta property="og:url" content="http://yoursite.com/2020/05/20/cmu15-445-%E6%95%B0%E6%8D%AE%E5%BA%93%E5%AD%98%E5%82%A8part2/index.html">
+<meta property="og:site_name" content="wwow&#39;s blog">
+<meta property="og:description" content="面向磁盘型数据库系统page布局log-structured上节课我们在讲到page布局时说到了tuple-oriented的方式，使用slotted page的方法将每一个tuple对应的偏移量保存在slot中，这样就能在定位到tuple在page内部的位置。这节课将会补充说明另外一种log-structured方法。 这种组织方式不是将所有tuple存放在page内，而是去存储这些与创建tup">
+<meta property="og:locale">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/A1RC090MJI4LMOEA@U.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/LL5CTSZNWS8QUP7F0C9.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/74VPNL9FMFJDGJQX22.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/FS6JFPWQMJ64PFZ5Q5BE.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/ROPOTIGFQVK5O61RP0Y.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/3YPWWCCMT__TLDS9FJE.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/14SWR3PFWQXPZ5H50NAG.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/DB6OZH9J2H0VRZBWO7.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/OYDFSCHSBF_A6U5V_BC.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/0_TOTHQYU6B6BDL_4U.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/TABJOLPNBG_VVPNNXC.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/LOCXWKSDB4PESV7PCX0.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/G6W_S2VGOO@GURKGHTKP.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/BO0O2JTCANVOAO90.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/E2R4NIZQ2@N_MVBGVU.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/QEYKSEYUL736A_STI7N5B.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/NZRLABY__QWY50VNKC@T9E.png">
+<meta property="article:published_time" content="2020-05-20T10:01:10.000Z">
+<meta property="article:modified_time" content="2020-08-30T04:03:24.315Z">
+<meta property="article:author" content="wwow">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/A1RC090MJI4LMOEA@U.png">
+
+<link rel="canonical" href="http://yoursite.com/2020/05/20/cmu15-445-%E6%95%B0%E6%8D%AE%E5%BA%93%E5%AD%98%E5%82%A8part2/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-Hans'
+  };
+</script>
+
+  <title>CMU15-445学习笔记-数据库存储part2 | wwow's blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">wwow's blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/05/20/cmu15-445-%E6%95%B0%E6%8D%AE%E5%BA%93%E5%AD%98%E5%82%A8part2/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/uploads/avatar.png">
+      <meta itemprop="name" content="wwow">
+      <meta itemprop="description" content="努力不一定会成功，但不努力真的很舒服">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="wwow's blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          CMU15-445学习笔记-数据库存储part2
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-05-20 18:01:10" itemprop="dateCreated datePublished" datetime="2020-05-20T18:01:10+08:00">2020-05-20</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-08-30 12:03:24" itemprop="dateModified" datetime="2020-08-30T12:03:24+08:00">2020-08-30</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/cmu15-445/" itemprop="url" rel="index"><span itemprop="name">cmu15-445</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="面向磁盘型数据库系统"><a href="#面向磁盘型数据库系统" class="headerlink" title="面向磁盘型数据库系统"></a>面向磁盘型数据库系统</h2><h3 id="page布局"><a href="#page布局" class="headerlink" title="page布局"></a>page布局</h3><h4 id="log-structured"><a href="#log-structured" class="headerlink" title="log-structured"></a>log-structured</h4><p>上节课我们在讲到page布局时说到了<strong>tuple-oriented</strong>的方式，使用slotted page的方法将每一个tuple对应的偏移量保存在slot中，这样就能在定位到tuple在page内部的位置。这节课将会补充说明另外一种<strong>log-structured</strong>方法。</p>
+<p>这种组织方式不是将所有tuple存放在page内，而是去存储这些与创建tuple，修改tuple相关的日志信息。在page内部，我们不断的追加日志信息，并且这些信息是以文本形式存储的。当我们对tuple执行某项操作（insert xxx,update xxx等)，我们只需要将这个操作记录为一个日志条目并且追加到page的尾部就行。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/A1RC090MJI4LMOEA@U.png"></p>
+<p>log-structured的页存储方式</p>
+<p>这样做的一大好处就是操作起来更快，对于磁盘来说，循序访问的速度要快于随机访问。如果我们使用<strong>slotted pages</strong>方式组织page，假设当前我要去更新10个tuple，它们在不同page上，那我就需要在10个page上来写入并更新这些tuple。但如果我使用log-structured的方式，那么我就能够将10条更新语句写在单个page上，一次就能搞定。</p>
+<p>这项技术在HDFS和S3之类的分布式文件系统中只支持这种追加的page组织方式。</p>
+<p>但这种方式的一大缺陷就是读取十分麻烦，当我们要读取一条tuple时，我们就需要从page的最后一条日志反向查找，看看有关这条tuple的日志中记录的最终值是多少。当我们对tuple进行批量操作的时候，这个弊端就更加显著。</p>
+<p>我们可以使用几种方式来加速的过程，我们可以建立索引，记录不同tuple对应日志的偏移量，读取时我们跳到特定的偏移量处就能读出我想要的数据。</p>
+<p>我们也可以周期性的压缩日志。即重新把日志从头走一遍，这样一来我们就能知道当前情况下各个tuple的值是多少，我们可以把之前的日志全部删除，只保留tuple当前的值。（如下图所示）这也能解决日志无限增长占用大量空间的问题。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/LL5CTSZNWS8QUP7F0C9.png"></p>
+<p>虽然我们介绍了log-structured的方法，但是本课程中我们假设我们面对的是slotted page型数据库。</p>
+<h3 id="使用tuple表示数据"><a href="#使用tuple表示数据" class="headerlink" title="使用tuple表示数据"></a>使用tuple表示数据</h3><p>前面我们讲到了数据库是由一系列page组成的，讨论到了如何将heap文件拆分为page，接着说到了page内部的slot数组。现在我们想知道在tuple内，我们如何去表示不同属性或列的数据。</p>
+<p>在高级层面而言tuple只是一串字节序列，而数据库管理系统需要去解释它的意思，弄清楚它的类型。这节课上，我们需要把这些字节数组组织成tuple，然后当数据库执行查询时，我们要去解释这些字节数组中的实际内容，以此来生成我们所寻找的答案。</p>
+<p>在大部分数据库中，例如对于<strong>固定长度</strong>的类型（integer，bigint，smallint，float/real），我们使用的表达方式与C和C++相同（遵循IEEE-754标准），对于不定长类型我们的表达方式则有所不同。</p>
+<p>基本上讲，float/real属于浮点数，numeric/decimal属于定点数，定点数的表达方式需要我们在数据库中自行实现。</p>
+<p>对于可变长度类型（varchar，text，blob等），它们一般有一个头部，它会保存数据的长度，在头部后面跟着真实数据的字节序列。与C中的字符串不同，C是在结束位置提供一个‘/0’作为终结符，但这里我们使用一个前缀来指明数据的大小。</p>
+<p>对于time/date/timestamp类型，大多数数据库会保存从1970年1月1日起的秒数或毫秒数甚至微秒数来处理时间。</p>
+<h4 id="浮点数（float-real）和定点数（decimal-numeric）对比"><a href="#浮点数（float-real）和定点数（decimal-numeric）对比" class="headerlink" title="浮点数（float/real）和定点数（decimal/numeric）对比"></a>浮点数（float/real）和定点数（decimal/numeric）对比</h4><p>对于float，real/double这些可变精度类型，它们是CPU或C++提供给我们的<strong>不精确</strong>数字。</p>
+<p>浮点数执行操作的速度要比定点数快得多，因为CPU有能够高效处理浮点数操作的指令，一条CPU指令就能对两个浮点数进行相加或想相。但处理定点数时，我们需要写一大堆东西对它们进行处理，这意味着对于定点数的操作，需要执行更多的指令。</p>
+<p>从效率角度而言，我们似乎更应该使用浮点数，但是这也存在一个问题，浮点数存在舍入误差，这在很多情况可能导致严重的问题（航天工程，金融系统等）。</p>
+<p>#include&lt;stdio.h&gt;<br>int main(){<br>    double a=0.1;<br>    double b=0.2;<br>    double c=0.3;<br>    if(a+b==c)<br>        printf(“true”);<br>    return 0;<br>}</p>
+<p>执行上述代码，我们可以发现并不会输出“true”，为什么0.1+0.2≠0.3？这就是因为double存在舍入误差，在IEEE-754标准中无法精确的表示浮点数。</p>
+<p>为了避免不准确的数据造成错误，我们选择使用定点数。这也是我们要在数据库中自行实现的内容。</p>
+<p>（Andy在课堂上对于real和decimal类型的数据处理做了上机演示，结论是decimal类型的数据处理时间比real慢了一倍，但real的计算结果会存在精度问题。）</p>
+<p>下面我们看一看PostgreSQL中numeric类型的结构（由于PostgreSQL是开源而其他两个数据库是闭源的，所以举它的例子）。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/74VPNL9FMFJDGJQX22.png"></p>
+<p>PostgreSQL中numeric类型的结构</p>
+<p>可以看到，表示numeric类型具体数值的部分其实是使用unsigned char来存储的，所以对于numeric数据类型而言它们需要自行编写对应的数据处理函数，这也导致了numeric类型的数据处理效率较差（float，double这些浮点数的数据处理有对应的CPU指令）</p>
+<h3 id="存储一个过大的数据"><a href="#存储一个过大的数据" class="headerlink" title="存储一个过大的数据"></a>存储一个过大的数据</h3><h5 id="overflow-page"><a href="#overflow-page" class="headerlink" title="overflow page"></a>overflow page</h5><p>我们会遇到一些情况导致我们要存储的数据无法保存在单个page下，我们使用overflow page来解决这个情况。</p>
+<p>下面这个例子中，该tuple的属性c由于过大无法与其他属性放在同一个page中。所以我们通过保存一个指针在属性c处，通过这个指针来指向保存了真实数据的overflow page。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/FS6JFPWQMJ64PFZ5Q5BE.png"></p>
+<p>overflow page</p>
+<p>当一个查询请求属性c作为输出的一部分时，就根据这个指针，找到对应的page，并将它拷贝下来，并生成一个输出结果。</p>
+<p>同样的，如果属性c的数据大到无法在一个page中存放，那么就从属性c中继续拆分一些数据，存放在另外的overflow page，并在当前overflow page中存储到对应page的指针。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/ROPOTIGFQVK5O61RP0Y.png"></p>
+<p>多级的overflow page</p>
+<p>对于overflow page中的数据，依然应该具备常规数据应有的保护措施，但是我们难以通过常规手段对overflow page进行操作，所以需要针对overflow page进行各种各样的优化。在PostgreSQL中，大部分时候这些overflow page都是只读的，很少在上面写入东西，这样可以尽可能的降低维护overflow page的复杂度。</p>
+<h5 id="外部存储"><a href="#外部存储" class="headerlink" title="外部存储"></a>外部存储</h5><p>除了将过大的数据存储在overflow page，我们还可以使用外部存储来存放数据。</p>
+<p>其基本思路就是我们不将属性的数据保存在tuple内部，而是保存一个指针或是文件路径，它们指向了存储数据的本地磁盘，网络存储或是某些外部设备。</p>
+<p>一般情况下，我们只能读取存放在外部存储的数据，而不能操作它。但是如果有人在数据库系统之外对该文件进行了修改，那么我们应该能够发现其中的变化，因为外部存储实际上超出了我们数据库系统的控制范围和保护范围。</p>
+<p>什么情况下我们会使用外部存储？对于一些视频网站而言，它们需要保存使用者上传的视频文件，这些视频文件大多超过1G，我们不可能把这些视频文件全部放入数据库中，因为这会占用非常庞大的空间，且代价极高。所以我们可以将这些视频文件存储到更便宜的外部设备上，以此来降低成本。</p>
+<p>那么我们来说什么时候使用overflow page，什么时候使用外部存储呢？</p>
+<p>在2000年左右的时候，任何小于256KB的数据，我们会将它保存在一个overflow page中；任何大于256KB中，我们会将它保存在外部存储上。但是这都不是硬性要求，这只是经过性能和经济方面的考量后，所得到的结果。</p>
+<h3 id="system-catalog"><a href="#system-catalog" class="headerlink" title="system catalog"></a>system catalog</h3><p>system catalog中保存了数据库相关信息的元数据，包括表名，索引以及用户权限等等。多数数据库系统会将它们的catalog使用一张表来存储。</p>
+<p>同时，数据库系统也会提供某种底层的方法来访问catalog，在早期，不同的数据库系统都有它们自己的catalog和对应不同的访问方式，这对于用户而言十分不友好，当应用程序从一个数据库系统迁移到另一个数据库系统时，我们需要根据新的数据库系统的catalog来重写相关的代码。</p>
+<p>为了解决这些catalog多样化带来的问题，ANSI标准以及SQL标准定义了一种称为INFORMATION_SCHEME的catalog接口，每个数据库系统都需要支持它。但不同的数据库也额外使用了不同的快捷方式来得到这些数据。下图就是不同数据库中查看catalog的方式。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/3YPWWCCMT__TLDS9FJE.png"></p>
+<p>我们可以使用这些命令看一看catalog具体是怎样的（只列出postgreSQL的情况，其他数据库可以自行尝试）</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/14SWR3PFWQXPZ5H50NAG.png"></p>
+<p>使用/d得到所有表的列表</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/DB6OZH9J2H0VRZBWO7.png"></p>
+<p>使用/d+得到更多的信息</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/OYDFSCHSBF_A6U5V_BC.png"></p>
+<p>对某张表是用\d+ &lt;db_name&gt;得到这张表的scheme</p>
+<p>我们可以根据catalog中所展现的表的scheme去解析存储在数据库中的tuple，之前提到对于存储层而言，我们的tuple只是一串字符序列，它没有任何意义，但数据库有义务对这一串字符序列进行解释。如图中的例子，通过scheme，我们可以知道这个tuple的第一个属性是integer，它占了32位空间，第二个属性也是integer，它也占了32位空间，这样我们就能够来划分字符序列，并将它解释为一个有意义的tuple。</p>
+<p>通过关注数据库的catalog，我们可以跟踪查看我们的scheme，当我们去查询以及构建索引时，会使用到它，并决定我们如何去做。通过scheme，我们可以了解数据的布局，从而将一条字符序列解释为tuple，但是注意，如果我们需要对每一条tuple都分析数据布局，这实际上会很慢，因为重复了大量冗余的操作（同一个表下的tuple数据布局都是一样的），在高级的系统中，可以在运行时进行编译或是代码生成来减少重复的解释操作（例如通过JVM中的JIT(Just-in-time）编译来对这些操作进行编译）。</p>
+<h3 id="存储模型"><a href="#存储模型" class="headerlink" title="存储模型"></a>存储模型</h3><p>在第一节课上提到了关系模型（Ted Codd的论文）但它并没有说明我们该如何去存储数据（字节数组，类型等内容），它甚至没有说明我们需要将tuple的所有属性保存在内存或磁盘中。到目前为止，我们在课堂上可视化数据库时，我们都是使用行来表示某个tuple的所有属性，但对于某些workload来说，这不是最好的处理方式。</p>
+<h4 id="workload"><a href="#workload" class="headerlink" title="workload"></a>workload</h4><p>在本门课的数据库系统中，我们所关心的workload有两种，<strong>OLTP</strong>和<strong>OLAP</strong>。</p>
+<h5 id="OLTP（On-line-Transaction-Processing）"><a href="#OLTP（On-line-Transaction-Processing）" class="headerlink" title="OLTP（On-line Transaction Processing）"></a>OLTP（On-line Transaction Processing）</h5><p>OLTP被称为联机事务处理，当我们构建一个新的应用程序时就会遇到它（website，app等）。OLTP的思路是我们从外界取得新的数据后，将它们放入我们的数据库，这些操作非常简单，它们一般只涉及小部分数据的更新或读取。</p>
+<p>举例来说，对于电商平台，当我在网站上购买东西的时候，就是对应用程序的OLTP（即联机事务处理），因为我会向我的购物车里添加商品，然后结账，最后更新我的账户信息。由于电商平台总会有很多人浏览并购买东西，所以它会处理大量的这种操作。但从一名顾客的角度而言，我不会更新太多数据，我更新的是我的账户信息，我的购物车信息，这些查询和更新只会访问数据库中很小的一部分信息（只访问属于我的那一小撮信息）。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/0_TOTHQYU6B6BDL_4U.png"></p>
+<p>上图是wikipedia内部的例子，我们有三张表，在revision表中，我们保存的是每篇文章的更新记录，在pages表中有一个对revision的外键引用，表示这是该page的最新版本，使用者可以无须扫描，直接跳转到此处取数据。然后我们对这些表执行OLTP操作。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/TABJOLPNBG_VVPNNXC.png"></p>
+<p>第一个SQL语句可以拿到page当前的revision，第二个SQL语句表示使用者在登陆账号时更新他的账号登陆信息。这些操作都只会访问小部分的tuple。在OLTP中我们会不断重复做这类事情。</p>
+<h5 id="OLAP（On-line-Analytical-Processing"><a href="#OLAP（On-line-Analytical-Processing" class="headerlink" title="OLAP（On-line Analytical Processing)"></a>OLAP（On-line Analytical Processing)</h5><p>OLAP被称为联机分析处理，当我们从OLTP应用程序中收集到一大堆数据时，我们会想去分析它，并从中得到新的信息，这也被称为数据科学，即从已有的数据中派生处新的信息。</p>
+<p>在这种情况下，我们不会去更新数据，它所要做的就是从已有的信息中为我们分析提供新的信息，我们会试着让这些信息变得有意义。</p>
+<p>我们还是以上述的wikipedia为例子。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/LOCXWKSDB4PESV7PCX0.png"></p>
+<p>这条SQL语句会去统计每个月里，主机名以.gov结尾的用户登陆数量。这种类型的查询就是只读的，它会去读取大量数据，例如扫描整张表。在OLTP（联机事务处理）中，我只会去更新一个东西，但是对于OLAP（联机分析处理）来说，我要去做大量的join，并读取大量的数据。</p>
+<h5 id="OLTP与OLAP的对比"><a href="#OLTP与OLAP的对比" class="headerlink" title="OLTP与OLAP的对比"></a>OLTP与OLAP的对比</h5><p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/G6W_S2VGOO@GURKGHTKP.png"></p>
+<p>上图可以粗略的表达不同workload的操作复杂度，可以看到，OLTP擅长简单的查询，但会做大量的写入操作；OLAP会做大量的读操作，并且它更复杂。图中我们还能看到一种新的workload，它被称为混合事务分析处理（HTAP），它试着将OLTP和OLAP混合在一起，既想要提取数据，又想在拿到数据时对它进行分析。</p>
+<p>（Q1：OLAP和NoSQL或NewSQL系统间的关系是什么？（课堂内容）</p>
+<p>A1：图上的这些（OLAP,OLTP,HTAP）是workload的类型，而NoSQL和NewSQL是DBMS系统类型。对于传统的NoSQL系统，MongoDB，Cassandra以及Redis来说，它们属于靠近OLTP那块，我们主要往它们塞入新数据。</p>
+<p>NoSQL大约在2000年末时出现，许多公司为此投入大量资金，例如google，它们推出了HBase，BigTable和Hadoop，这些系统不去执行SQL，也不进行事务处理，更不会进行join操作，这就是它们能够扩展的原因。Hadoop具有在线分析处理的能力（OLAP），但像BigTable，Cassandra，MongoDB以及其他一些NoSQL数据库具备的则是OLTP联机事务处理的能力。</p>
+<p>然后人们开始意识到他们想要处理事务的能力，想要SQL，也想去进行某些join操作，因此，NewSQL应运而生。他们想要实现的想法是，在不放弃事务的前提下，拥有快速处理事务的能力和OLTP。</p>
+<p>)</p>
+<h4 id="n-ary存储模型（行存储模型）"><a href="#n-ary存储模型（行存储模型）" class="headerlink" title="n-ary存储模型（行存储模型）"></a>n-ary存储模型（行存储模型）</h4><p>我们再次回到存储模型的主题上来，目前我们展示tuple时，我们总是以行的方式展现它。这被称<strong>n-ary存储模型</strong>，它的基本思路是将单个tuple的所有属性，连续的存储在同一个page中，对于体积较大的数据我们也可以使用overflow page，但基本思路都是一样的。</p>
+<p>这是关于OLTP的一个想法，因为我们每次去访问的数据量在粒度上足够小（只访问少量tuple的全部属性），这样就能够访问单个实体，并拿到我的账户信息，我的订单信息，以及有关我账号的全部信息。我不需要关心其他几百万用户的信息，我只需要我自己的账号信息。如果它使用一行数据将我的账户信息连续存储，那么我的访问操作就非常的高效（相比column存储），我们只需要跳转到对应的page，并取到我想要的数据就结束了。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/BO0O2JTCANVOAO90.png"></p>
+<p>上图是使用n-ary存储模型时，我们执行SQL查询时的流程。通过该SQL语句我想要根据用户名和账号拿到账号信息，我们可以通过索引来查找（后续介绍），得到tuple所在的page id和slot number，然后我们通过一次查找和读取，将page放入内存中，并跳转到对应偏移量得到我想要的数据。对于插入操作也是类似，只需要找到一个空的slot，并将数据一次性写入就行。</p>
+<p>在这类请求下，将一个tuple的所有数据连续存储是读取数据时最高效的方式。</p>
+<p>那么在什么情况下，行存储是低效的呢？</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/E2R4NIZQ2@N_MVBGVU.png"></p>
+<p>回头看看这条SQL语句（上面OLAP处提到过它的内容）。当我们执行这条SQL语句时，我们实际上要对整个用户账号表进行扫描，根据hostname来找到以.gov结尾的账号。</p>
+<p>简单来说，我们只需要hostname和LastLogin这两个属性，就能够得到最终结果。由于行存储模式下，我们将一条tuple的全部属性连续存储在一起，且在非易失型存储设备中，我们每次读入读出都以page为单位，这两条限制导致我们可能会将其他不需要的属性一起读入内存（userId，userName，userPass）。可以看到我们读入了五个属性，但其中包含了三个没用的属性，当我们的数据量达到PB级别的话，这是非常低效的</p>
+<p>总结一下行存储模型，在n-ary存储模型中（行存储模型），当我们访问<strong>整个tuple</strong>的时候，即插入，更新以及删除tuple时的速度很快。但如果我们要进行一些分析型的查询以及做些OLAP工作并且想要扫描整张表的大部分内容时，n-ary存储模型就十分废柴了，因为我们会向内存中读入一大堆我们不需要的数据。</p>
+<p>为了解决n-ary存储模型所不能应对的情况，出现了column存储模型。</p>
+<h4 id="column存储模型（列存储模型）"><a href="#column存储模型（列存储模型）" class="headerlink" title="column存储模型（列存储模型）"></a>column存储模型（列存储模型）</h4><p>在列存储模型中，我们不会将单个tuple的全部属性放在单个page上，而是将所有tuple的某个属性放在同一个page中，即将单个列的所有值连续保存在一起。这对于OLAP而言十分友好，我们可以读取表的部分属性集合，而不是像行存储模型一样将全部属性读出。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/QEYKSEYUL736A_STI7N5B.png"></p>
+<p>回到上一个例子，这一次我们使用列存储模型。这一次我们只需将保存hostname的page放入内存中，并对每个hostname进行扫描匹配，这样我们就得到了能够匹配的tuple，接着把存储lastLogin的page读入内存，找到对应的lastLogin的值，最终生成输出结果。</p>
+<p>可以看到这一次我们只需要读取2个page（存储hostname和lastLogin的page），就能够生成输出结果，而行存储则需要读取全部page，考虑在极端情况下，如果我有上亿个page，行存储模式的优越性就很明显。</p>
+<h5 id="压缩数据"><a href="#压缩数据" class="headerlink" title="压缩数据"></a>压缩数据</h5><p>同时，列存储还有一个优点就是可压缩。对于行存储模型而言，不同属性对应的数据类型不同，在存储时，这些不同类型的数据被连续的存放在一起，显得十分散乱，我们难以直接分辨它们，所以对于行存储的压缩是较为困难的。</p>
+<p>但对于列存储模型来说，一个page只会存放同一个属性的值，这些数据的类型显然是相同的，并且其中某些数据的值可能是相同的，那么我们就能够对它们进行压缩。</p>
+<p>举例来说，我们要存储室内不同时间的温度，现在室内的温度是36度，一小时之后温度是36.1度，两小时后是36.2度，这些温度没有太多波动，我们无需完整的保存每次的温度数据，只需要将第一次记录的温度作为标准，然后记录每次新的温度和标准之间的差值即可，这样我们就能够保存较小的值。</p>
+<p>对于原先只能存放1000个tuple的page，也许在进行了压缩之后，能够存放10000个数据。并且某些系统可以在未解压的情况下直接对数据进行操作，这就很美妙了…</p>
+<h5 id="定位tuple的属性"><a href="#定位tuple的属性" class="headerlink" title="定位tuple的属性"></a>定位tuple的属性</h5><p>在列存储模式中，是否会将主键和每一个属性一起保存，即如何弄清某个hostname一开始是在哪一条tuple中？</p>
+<p>我们有两种方法做这件事。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/NZRLABY__QWY50VNKC@T9E.png"></p>
+<p><strong>Fixed-length Offsets</strong></p>
+<p>第一种方案使用固定长度的偏移量，也就是说对于一列中的每个值而言，它的长度是固定的。</p>
+<p>如上图，如果我们知道pageA中的一个属性x的偏移量d，该如何定位pageB中与x同属于一个tuple的属性y的偏移量D呢？</p>
+<p>由于所有属性都是定长的，假设pageA中单个属性的长度为32位，而pageB中单个属性的类型为8位，那么我们首先确定x在A中的rowId（或者叫slot number，怎么命名取决于自己，但是不要和之前讲的那些弄混了）</p>
+<p>rowId=d/32</p>
+<p>然后就可以得到y在pageB中的偏移量D=indexA*8</p>
+<p>经过很简单的计算就能够得到数据的位置。</p>
+<p>但是如果遇上可变长类型怎么办？</p>
+<p>我们可以将它压缩成一个定长的数据或是对可变长数据进行填充，让他的长度变成我们所允许的最大长度。</p>
+<p>对于大多数系统而言，它们都使用Fixed-length Offsets的方法来定位tuple的属性。</p>
+<p><strong>Embedded tuple id</strong></p>
+<p>该方法中，我们为列中的每一个值都保存一个主键或是标识符，通过这个主键或是标识符来定位tuple的属性（上图右侧示例）</p>
+<p>但这种方法是很糟糕的，因为我们要为每一个值额外花费32位或是64位的空间来保存它们的标识符，这是十分浪费的，所以大多数系统不使用这种方法。</p>
+<p>总结一下列存储模型，对于列存储模型而言，它的优点是当我们进行OLAP查询时，可以显著降低无用I/O操作的数量，它不会读取我们不需要的page，借此提高系统的性能，并且它能够更好的支持压缩。但它的缺点也十分显著，由于我们将一个tuple的所有属性分开存储，当我们要读取或更新一条tuple时，就需要读取多个page，并将这些page中的属性拼接起来。</p>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>我们明白了，数据库的存储管理不应该完全独立于DBMS的其他部分，即对于DBMS的其他部分而言，存储管理不应该是个黑盒。当我们的数据库知道它要做什么，数据看起来是怎样的，它就能够更好的做出判断以及设计选择，并更加高效的执行查询操作。</p>
+<p>另一方面，我们了解了OLTP和OLAP，在OLTP中，我们使用行存储，在OLAP中，我们使用列存储，简单的规则能够让我们的职业生涯更加轻松。</p>
+<p>这两节课中，我们讨论了DBMS如何在磁盘上表示文件，下节课我们会讨论如何将数据放入内存，并对它们进行管理。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/05/14/cmu15-445-%E6%95%B0%E6%8D%AE%E5%BA%93%E5%AD%98%E5%82%A8part1/" rel="prev" title="CMU15-445学习笔记-数据库存储part1">
+      <i class="fa fa-chevron-left"></i> CMU15-445学习笔记-数据库存储part1
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/05/27/cmu15-445-%E7%BC%93%E5%86%B2%E6%B1%A0%E5%92%8C%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86/" rel="next" title="CMU15-445学习笔记-缓冲池和内存管理">
+      CMU15-445学习笔记-缓冲池和内存管理 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%9D%A2%E5%90%91%E7%A3%81%E7%9B%98%E5%9E%8B%E6%95%B0%E6%8D%AE%E5%BA%93%E7%B3%BB%E7%BB%9F"><span class="nav-number">1.</span> <span class="nav-text">面向磁盘型数据库系统</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#page%E5%B8%83%E5%B1%80"><span class="nav-number">1.1.</span> <span class="nav-text">page布局</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#log-structured"><span class="nav-number">1.1.1.</span> <span class="nav-text">log-structured</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BD%BF%E7%94%A8tuple%E8%A1%A8%E7%A4%BA%E6%95%B0%E6%8D%AE"><span class="nav-number">1.2.</span> <span class="nav-text">使用tuple表示数据</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%B5%AE%E7%82%B9%E6%95%B0%EF%BC%88float-real%EF%BC%89%E5%92%8C%E5%AE%9A%E7%82%B9%E6%95%B0%EF%BC%88decimal-numeric%EF%BC%89%E5%AF%B9%E6%AF%94"><span class="nav-number">1.2.1.</span> <span class="nav-text">浮点数（float&#x2F;real）和定点数（decimal&#x2F;numeric）对比</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AD%98%E5%82%A8%E4%B8%80%E4%B8%AA%E8%BF%87%E5%A4%A7%E7%9A%84%E6%95%B0%E6%8D%AE"><span class="nav-number">1.3.</span> <span class="nav-text">存储一个过大的数据</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#overflow-page"><span class="nav-number">1.3.0.1.</span> <span class="nav-text">overflow page</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E5%A4%96%E9%83%A8%E5%AD%98%E5%82%A8"><span class="nav-number">1.3.0.2.</span> <span class="nav-text">外部存储</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#system-catalog"><span class="nav-number">1.4.</span> <span class="nav-text">system catalog</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AD%98%E5%82%A8%E6%A8%A1%E5%9E%8B"><span class="nav-number">1.5.</span> <span class="nav-text">存储模型</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#workload"><span class="nav-number">1.5.1.</span> <span class="nav-text">workload</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#OLTP%EF%BC%88On-line-Transaction-Processing%EF%BC%89"><span class="nav-number">1.5.1.1.</span> <span class="nav-text">OLTP（On-line Transaction Processing）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#OLAP%EF%BC%88On-line-Analytical-Processing"><span class="nav-number">1.5.1.2.</span> <span class="nav-text">OLAP（On-line Analytical Processing)</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#OLTP%E4%B8%8EOLAP%E7%9A%84%E5%AF%B9%E6%AF%94"><span class="nav-number">1.5.1.3.</span> <span class="nav-text">OLTP与OLAP的对比</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#n-ary%E5%AD%98%E5%82%A8%E6%A8%A1%E5%9E%8B%EF%BC%88%E8%A1%8C%E5%AD%98%E5%82%A8%E6%A8%A1%E5%9E%8B%EF%BC%89"><span class="nav-number">1.5.2.</span> <span class="nav-text">n-ary存储模型（行存储模型）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#column%E5%AD%98%E5%82%A8%E6%A8%A1%E5%9E%8B%EF%BC%88%E5%88%97%E5%AD%98%E5%82%A8%E6%A8%A1%E5%9E%8B%EF%BC%89"><span class="nav-number">1.5.3.</span> <span class="nav-text">column存储模型（列存储模型）</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%E5%8E%8B%E7%BC%A9%E6%95%B0%E6%8D%AE"><span class="nav-number">1.5.3.1.</span> <span class="nav-text">压缩数据</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E5%AE%9A%E4%BD%8Dtuple%E7%9A%84%E5%B1%9E%E6%80%A7"><span class="nav-number">1.5.3.2.</span> <span class="nav-text">定位tuple的属性</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">1.6.</span> <span class="nav-text">总结</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="wwow"
+      src="/uploads/avatar.png">
+  <p class="site-author-name" itemprop="name">wwow</p>
+  <div class="site-description" itemprop="description">努力不一定会成功，但不努力真的很舒服</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">19</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">wwow</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

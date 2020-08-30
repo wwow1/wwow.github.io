@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.1.1">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"yoursite.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="https:&#x2F;&#x2F;github.com&#x2F;wwow1&#x2F;MIT-6.824 在lab3B的实验中，我们需要为3A的key-value服务添加日志压缩功能，在lab2C中，为了使server在重启时能够恢复之前的状态，我们对Raft中的几个持久化变量以及log进行了持久化保存，但是随着server的不断运行，其Raft中log的内容也不断增加，这将会导致我们在持久化log内容的时候耗费大量的存储空间。为了">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MIT-6.824-lab3B-kvraft">
+<meta property="og:url" content="http://yoursite.com/2020/04/10/mit-6-824-lab3b-kvraft/index.html">
+<meta property="og:site_name" content="wwow&#39;s blog">
+<meta property="og:description" content="https:&#x2F;&#x2F;github.com&#x2F;wwow1&#x2F;MIT-6.824 在lab3B的实验中，我们需要为3A的key-value服务添加日志压缩功能，在lab2C中，为了使server在重启时能够恢复之前的状态，我们对Raft中的几个持久化变量以及log进行了持久化保存，但是随着server的不断运行，其Raft中log的内容也不断增加，这将会导致我们在持久化log内容的时候耗费大量的存储空间。为了">
+<meta property="og:locale">
+<meta property="article:published_time" content="2020-04-10T02:45:39.000Z">
+<meta property="article:modified_time" content="2020-08-30T04:00:35.186Z">
+<meta property="article:author" content="wwow">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://yoursite.com/2020/04/10/mit-6-824-lab3b-kvraft/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-Hans'
+  };
+</script>
+
+  <title>MIT-6.824-lab3B-kvraft | wwow's blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">wwow's blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/04/10/mit-6-824-lab3b-kvraft/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/uploads/avatar.png">
+      <meta itemprop="name" content="wwow">
+      <meta itemprop="description" content="努力不一定会成功，但不努力真的很舒服">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="wwow's blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          MIT-6.824-lab3B-kvraft
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-04-10 10:45:39" itemprop="dateCreated datePublished" datetime="2020-04-10T10:45:39+08:00">2020-04-10</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-08-30 12:00:35" itemprop="dateModified" datetime="2020-08-30T12:00:35+08:00">2020-08-30</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/mit6-824/" itemprop="url" rel="index"><span itemprop="name">mit6.824</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p><a target="_blank" rel="noopener" href="https://github.com/wwow1/MIT-6.824">https://github.com/wwow1/MIT-6.824</a></p>
+<p>在lab3B的实验中，我们需要为3A的key-value服务添加日志压缩功能，在lab2C中，为了使server在重启时能够恢复之前的状态，我们对Raft中的几个持久化变量以及log进行了持久化保存，但是随着server的不断运行，其Raft中log的内容也不断增加，这将会导致我们在持久化log内容的时候耗费大量的存储空间。为了改进这一情况，我们需要在kvraft中增加能够持久性保存当前状态的Snapshot，当kvraft的当前状态存入Snapshot后，我们就可以使Raft丢弃快照之前的log达到节省空间的目的。</p>
+<p>在lab3B的测试中，将会传入一个MaxRaftState变量，它记录了当前允许的Raft持久化数据的最大值，当Raft持久化数据的容量大于MaxRaftState时，我们的kvraft就需要保存一个快照，并只是Raft丢弃旧的日志条目</p>
+<p>这里有一点需要注意的是，在lab3B之前，我们都是使用Slice来保存Raft log的，但是使用Slice无法实现“丢弃旧的日志”这一功能，因为丢弃旧的日志后，新的日志的下标并不会重新从0开始计数，假设当前快照对应的最后一个LogIndex=n，那么下一个传入的log的index应该为n+1。所以在这里，我首先将保存log的容器改为map。</p>
+<p>我本来以为将log改为map存储很简单，只需要修改对应的变量就行，但是还是遇到了一些小问题，例如Slice是支持多个线程同步访问的，但是map就不行，所以需要将代码中使用到log的部分加上锁。这里给大家推荐另外一种方法，直接使用sync.Map，这个数据结构会在使用时自动实现上锁的功能，就不需要在每次访问log的时候都去一一加锁。（一开始我也使用了Sync.Map,但是由于当时没弄懂gob.Register，所以在RPC调用的时候，传入的log直接变空值了，于是我就放弃了它- -）</p>
+<p>这里特别提醒一下，如果大家使用LastLogIndex=len（rf.log）-1这个句子来得到LastLogIndex的话，那么一定要记得修改，因为换用map，同时加入了discard log功能后，len（rf.log）-1得到的值将小于真实的LastLogIndex。我建议还是使用遍历map的方法.</p>
+<p>在完成了将log容器从Slice过度到Map之后，我们就可以开始编写Snapshot的相关代码了</p>
+<p><strong>1.Snapshot结构</strong></p>
+<p>首先我们需要确认，哪些数据需要被保存在Snapshot中？</p>
+<p>既然是通过Snapshot保存状态，那么当前保存的kv.DB信息肯定需要加入其中，然后还需要ApplyNum来保证在重启后不会发生request dup，最后是LastIncludedIndex和LastIncludedTerm保存Snapshot包含的最后一个log的Index和Term，通过这两个信息来指示Raft丢弃旧的log</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">type SnapShot struct&#123;</span><br><span class="line">	State map[string]string  &#x2F;&#x2F;key-&gt;value</span><br><span class="line">	ApplyNum map[int64]int   &#x2F;&#x2F;clientId-&gt;opnum</span><br><span class="line">	LastIncludedIndex int</span><br><span class="line">	LastIncludedTerm int</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>2.周期性地检查Raft持久化状态的长度（CheckLogLength)</strong></p>
+<p>我使用了一个CheckLogLength的函数来周期性的检测Raft状态的长度，一旦发现Raft状态长度超过了MaxRaftState，就需要保存一个新的Snapshot，需要提醒的就是map的赋值不能直接使用=，而是需要跑一个循环将每一个数据一一进行复制。</p>
+<p>还有一个问题就是Snapshot中的LastIncludedIndex和LastIncludedTerm要如何确认？我使用了两个新的变量kv.commitIndex和kv.commitTerm来记录被kvraft apply的最后一个raft log，所以需要在apply()函数中增加代码来更新commitIndex和commitTerm</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">if op.Index&gt;kv.commitIndex&#123; &#x2F;&#x2F;in apply()</span><br><span class="line">	kv.commitIndex&#x3D;op.Index</span><br><span class="line">	kv.commitTerm&#x3D;op.Term</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在每次保存Snapshot的时候，就将当前的kv.commitIndex和kv.commitTerm作为LastIncludedIndex和LastIncludeTerm存入新的Snapshot中</p>
+<p>在记录完Snapshot后，需要调用Raft中的函数丢弃旧log</p>
+<p><strong>3.使用Snapshot恢复状态（RestoreSnapshot）</strong></p>
+<p>在Server启动时，我们需要调用一个RestoreSnapshot函数来使用已经保存的Snapshot去恢复kvraft的状态。函数内容也很简单，把Snapshot中的数据解码之后复制给kvraft中对应的变量就行</p>
+<p>到此为止，我们在kvraft程序中的修改就大致结束了，然后需要转移到raft中完成剩余的内容</p>
+<p><strong>4.Raft根据kvraft提供的信息丢弃旧log（DiscardLog）</strong></p>
+<p>由kvraft中的CheckLogLength调用raft中的DiscardLog函数来丢弃旧log</p>
+<p>调用者应该需要提供LastIncludedIndex以及LastIncludedTerm，DiscardLog根据LastIncludedIndex对自己的log进行一轮遍历，丢弃所有index&lt;LastIncludedIndex的log，同时在Raft中也需要添加LastIncludedIndex和LastIncludedTerm两个变量（具体用处后面会说），说明一下这里更新lastApplied的操作其实是多余的，当时编写的时候没有去除掉。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">for i:&#x3D;1;i&lt;&#x3D;LastIncludedIndex;i++&#123; &#x2F;&#x2F;in discardLog()</span><br><span class="line">	_,ok:&#x3D;rf.log[i]</span><br><span class="line">	if ok &#123;</span><br><span class="line">		delete(rf.log,i)</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line">rf.lastIncludedIndex&#x3D;LastIncludedIndex</span><br><span class="line">rf.lastIncludedTerm&#x3D;LastIncludedTerm</span><br><span class="line">rf.lastApplied&#x3D;max(rf.lastApplied,rf.lastIncludedIndex)</span><br><span class="line">rf.persist()</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line">type Raft struct &#123;   # new Raft struct</span><br><span class="line">	mu        sync.Mutex   &#x2F;&#x2F; Lock to protect shared access to this peer&#39;s state</span><br><span class="line">	peers     []*labrpc.ClientEnd &#x2F;&#x2F; RPC end points of all peers</span><br><span class="line">	persister *Persister          &#x2F;&#x2F; Object to hold this peer&#39;s persisted state</span><br><span class="line">	me        int                 &#x2F;&#x2F; this peer&#39;s index into peers[]</span><br><span class="line">	applyCh chan ApplyMsg</span><br><span class="line"></span><br><span class="line">	electionTimeout int</span><br><span class="line">	leaderId int</span><br><span class="line">	t *time.Timer</span><br><span class="line">	currentTerm int   &#x2F;&#x2F;persistent state</span><br><span class="line">	votedFor int</span><br><span class="line">	log		map[int]Entry</span><br><span class="line">	&#x2F;&#x2F;lastIncludedTerm int</span><br><span class="line">	lastIncludedIndex int</span><br><span class="line">	lastIncludedTerm int</span><br><span class="line"></span><br><span class="line">	commitIndex int &#x2F;&#x2F;volatile state on all servers</span><br><span class="line">	lastApplied int</span><br><span class="line">	lastLogIndex int</span><br><span class="line">	outdate  bool</span><br><span class="line"></span><br><span class="line">	nextIndex []int&#x2F;&#x2F;valatile state on leader</span><br><span class="line">	matchIndex []int</span><br><span class="line"></span><br><span class="line">	preSnapShotIndex []int</span><br><span class="line">	killCh	chan bool</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在完成了前面4个内容之后，一个基本的日志压缩功能就实现了。但是大家也许会发现一个很严重的问题。假设现在Raft leader有50个log，并且这50个log都被压缩为Snapshot了，那么此时它的rf.log应该是空的，如果这时候有新的follower加入集群或者是某些follower刚才掉线了如今重新加入集群，那么大概率它们的log没有达到这50个，但是我们的leader由于执行了日志压缩，leader的log已经是空的了，那leader肯定没办法通过AppendEntries为这些“掉队”的follower发送它们缺少的log，那这不就会造成不一致了吗？</p>
+<p>为了解决这个问题，我们还需要在raft中实现InstallSnapshotRPC，允许leader通过这个RPC发送它的Snapshot给follower，只要follwer直接保存了leader的Snapshot，那么它就不用请求缺失的log，而是直接跳跃到了leader的状态。</p>
+<p><strong>5.leader使用InstallSnapshotRPC向follower发送新的Snapshot（InstallSnapshot）</strong></p>
+<p>首先定义InstallSnapshotRPC的Args和reply</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">type InstallSnapshotArgs struct&#123;</span><br><span class="line">	Term int</span><br><span class="line">	LeaderId int</span><br><span class="line">	LeaderSnapShot []byte</span><br><span class="line">&#125;</span><br><span class="line">type InstallSnapshotReply struct&#123;</span><br><span class="line">	Term int</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>主要内容是leader的Snapshot数据，其次是LeaderId和Term，这几个变量的用处和lab2中的VoteRequestRPC和AppendEntriesRPC中作用一样，这里就不多说了。</p>
+<p>然后我们要编写InstallSnapshotRPC handler，首先RPC的标准部分，判断agrs.term和rf.term，然后…….（RPC基本操作）</p>
+<p>之后我们需要对LeaderSnapshot进行解码，这里主要是为了得到Snapshot中的leader.LastIncludedIndex（这里的leader是伪代码，表示leader的成员变量，下同），因为InstallSnapshotRPC的调用和实现都是在raft中，没有与上层kvraft进行交互，所以要得到Snapshot中的LastIncludedIndex只能通过直接解码得到。</p>
+<p>然后进行一个判断，当前follower的lastIncludedIndex是否小于LeaderSnapshot的（代码中的tmp.LastIncludedIndex）：</p>
+<p>如果不小于，说明这个follower已经拥有跟LeaderSnapshot一样新的Snapshot了，那么函数直接返回</p>
+<p>如果小于，那么需要使用LeaderSnapshot更新follower的Snapshot，首先将LeaderSnapshot通过ApplyCh传入kvraft层，让kvraft应用这个Snapshot，并且调用SavaSnapshot保存这个新的Snapshot。之后修改自己的LastIncludedIndex和LastIncludedTerm。</p>
+<p>我们还需要根据follower当前的log信息决定如何丢弃旧log，首先判断rf.log[tmp.LastIncludedIndex].Term==tmp.LastIncludedTerm（tmp是指解码后的数据），如果条件为true，说明对于follower而言，它在LastIncludedIndex之前的log都是正确的，那么只需要丢弃在这之前的log就行；如果条件为false，说明不能保证LastIncludedIndex之前，甚至这之后的log是否正确，那么旧需要丢弃全部的log。如果需要丢弃全部log，我们也需要使用LastIncludedIndex来修改rf.lastLogIndex和rf.commitIndex</p>
+<p>最后需要修改lastApplied的信息，这一点比较重要，更新了Snapshot相当于整个follower apply了所有LastIncludedIndex之前的log。反之不修改lastApplied的话，下一次apply的时候会apply nil（因为对应下标的log是空的）</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F;RPC handler的主要部分</span><br><span class="line"></span><br><span class="line">if rf.lastIncludedIndex&lt;tmp.LastIncludedIndex&#123;</span><br><span class="line">&#x2F;&#x2F;replace the old snapshot and apply the snapshot to kvraft</span><br><span class="line">	rf.applyCh&lt;-ApplyMsg&#123;tmp.LastIncludedIndex,nil,tmp.LastIncludedTerm,true,args.LeaderSnapShot&#125;</span><br><span class="line">	rf.persister.SaveSnapshot(args.LeaderSnapShot)</span><br><span class="line">	rf.mu.Lock()</span><br><span class="line">	rf.lastIncludedIndex&#x3D;tmp.LastIncludedIndex</span><br><span class="line">	rf.lastIncludedTerm&#x3D;tmp.LastIncludedTerm</span><br><span class="line">	if rf.log[tmp.LastIncludedIndex].Term&#x3D;&#x3D;tmp.LastIncludedTerm&#123;</span><br><span class="line">		fmt.Printf(&quot;%v clear log before %v\n&quot;,rf.me,tmp.LastIncludedIndex)</span><br><span class="line">		for i:&#x3D;1;i&lt;&#x3D;tmp.LastIncludedIndex;i++&#123;</span><br><span class="line">			_,ok:&#x3D;rf.log[i]</span><br><span class="line">			if ok &#123;</span><br><span class="line">				delete(rf.log,i)</span><br><span class="line">			&#125;</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;else&#123;</span><br><span class="line">		fmt.Printf(&quot;%v clear all log entries\nlastIncludedIndex&#x3D;%v\n&quot;,rf.me,tmp.LastIncludedIndex)</span><br><span class="line">		rf.log&#x3D;make(map[int]Entry)</span><br><span class="line">		rf.log[0]&#x3D;Entry&#123;-1,0&#125;</span><br><span class="line">		rf.lastLogIndex&#x3D;tmp.LastIncludedIndex</span><br><span class="line">		rf.commitIndex&#x3D;tmp.LastIncludedIndex</span><br><span class="line">	&#125;</span><br><span class="line">	rf.persist()</span><br><span class="line">	rf.mu.Unlock()</span><br><span class="line">	rf.lastApplied&#x3D;max(tmp.LastIncludedIndex,rf.lastApplied)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>6.决定发送InstallSnapshotRPC的时机</strong></p>
+<p>决定发送InstallSnapshotRPC的时间点非常重要，如果一个follower没有leader.LastIncludedIndex之前的log，但是leader仍然向它发送了AppendEntriesRPC，那么这个follower不会得到中间这一段它缺失的log，但是却会更新它的commitIndex，那么它的applyEntry函数就会更具下标来apply这些缺失的log（也就是nil），造成错误。</p>
+<p>根据以上例子我们首先判断知道，如果需要发送InstallSnapshotRPC，那么它一定要在AppendEntriesRPC之前，所以我们首先在Start函数中加入一段发送InstallSnapshotRPC的代码</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F;在start()中判断是否发送RPC</span><br><span class="line"></span><br><span class="line">if rf.lastIncludedIndex&gt;rf.matchIndex[server]&#123;  &#x2F;&#x2F;install Snapshot</span><br><span class="line">	ok:&#x3D;rf.sendInstallSnapshot(server)</span><br><span class="line">	if ok&#123;</span><br><span class="line">		rf.mu.Lock()</span><br><span class="line">		rf.matchIndex[server]&#x3D;max(rf.lastIncludedIndex,rf.matchIndex[server])</span><br><span class="line">		rf.nextIndex[server]&#x3D;max(rf.lastIncludedIndex+1,rf.nextIndex[server])</span><br><span class="line">		rf.mu.Unlock()</span><br><span class="line">	&#125;else&#123;</span><br><span class="line">		return</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>对于leader而言，它并不能准确的知道每个follwer log的具体情况，那么就使用matchIndex来作为follower log的更新情况，如果leader.lastIncludedIndex&gt;leader.matchIndex[server]，那么说明这个follower需要更新Snapshot，那么就对它发送InstallSnapshot，如果RPC成功那么就需要修改对应的matchIndex和nextIndex。 如果RPC失败，那么我们就应该直接返回，而不应该向下走，否则会导致apply nil（上面提到过这种情况）</p>
+<p>在Start添加了InstallSnapshotRPC后，这里还有一点不足，就是如果上层的kvraft没有新的请求，在Start不被调用时，follower就无法通过leader的InstallSnapshotRPC在更新自己，所以我决定在HeartBeat中也加入发送InstallSnapshotRPC的判断。（程序段内容同上）</p>
+<p><strong>7.kvraft应用被apply的Snapshot</strong></p>
+<p>在InstallSnapshot中我们将新的Snapshot传入applyCh，那么在kvraft处，也需要编写函数来处理这个请求。由于在ApplyMsg中有一个UseSnapshot的bool量来标识当前请求是否是Snapshot，所以我们只需要在kvraft的apply()函数处增加一处判断和对应的处理程序就行。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F;server中apply Snapshot</span><br><span class="line">if op.UseSnapshot&#x3D;&#x3D;true&#123;  </span><br><span class="line">	fmt.Printf(&quot;useSnapShot index:%v\n&quot;,op.Index)</span><br><span class="line">	_&#x3D;kv.RestoreSnapShot(op.Snapshot)</span><br><span class="line">	continue</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在apply Snapshot的时候想到了一个问题，从raft apply的Snapshot是否一定要调用RestoreSnapshot？ 假如当前kvraft的状态更新，那么应用了这个Snapshot不就出错了吗？虽然可以知道一开始Leader发送InstallSnapshotRPC的时候就是认为这个follower不含有该Snapshot对应的log，但是这个想法也许并不准确（根据matchIndex来判断是否发送RPC），所以为了防止应用Snapshot出错，我又在RestoreSnapshot中增加了一层条件保护</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F;kvraft：RestoreSnapshot中的条件保护</span><br><span class="line">if kv.commitIndex&gt;tmp.LastIncludedIndex&#123;</span><br><span class="line">	return false</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>因为我们前面提到了kvraft中的commitIndex指的是已经应用的log Index，那么如果它的值大于Snapshot中的LastIncludedIndex，就说明当前kvraft的状态比Snapshot中的状态更新。到这里</p>
+<p><strong>8.对原有raft代码的修改</strong></p>
+<p>完成了以上步骤之后，看似已经完成了lab3B，其实不然，真正的debug之路才刚刚开始（心态爆炸），在加入了discard log这一内容之后，我们原有的raft代码将不再适用于此，需要做许多改进和保护，否则根本跑不动= =</p>
+<p>首先是对RequestVoteRPC的修改</p>
+<p>我们知道，在RequestVoteRPC中，follower向candidate的条件是</p>
+<p>1.candidate.lastLogTerm&gt;follower.LastLogTerm</p>
+<p>2.candidate.LastLogTerm=follower.LastLogTerm &amp;&amp; candidate.LastLogIndex&gt;=follower.LastLogIndex</p>
+<p>这里就需要考虑一种情况，follower或者Candidate的log因为更新Snapshot而被全部清空，那么我们就不能像原来一样使用rf.log[rf.lastLogIndex].Term来得到它们的LastLogTerm，因为这样得到的Term一定为0，这样就会导致出错，在这种情况下正确的做法应该是使用lastIncludedTerm来作为LastLogTerm参与判断（这也是为什么我们在raft中要保存这个变量的原因）</p>
+<p>那么在发送RequestVoteRPC之前，就需要对follower传入RPC的LastLogTerm做一个保护</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F;发送RequestVoteRPC前，对Candidate.LastLogIndex做保护</span><br><span class="line">if rf.lastIncludedIndex&gt;&#x3D;rf.lastLogIndex&#123;</span><br><span class="line">	lastLogIndex&#x3D;rf.lastIncludedIndex</span><br><span class="line">	lastLogTerm&#x3D;rf.lastIncludedTerm</span><br><span class="line">&#125;else&#123;</span><br><span class="line">	lastLogIndex&#x3D;rf.lastLogIndex</span><br><span class="line">	lastLogTerm&#x3D;rf.log[rf.lastLogIndex].Term</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>另一方面，在执行RequestVote时，也需要对follower的LastLogIndex做保护</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F;效果同上，只是写法略微不同</span><br><span class="line">lastLogTerm:&#x3D;max(rf.log[rf.lastLogIndex].Term,rf.lastIncludedTerm) </span><br></pre></td></tr></table></figure>
+
+<p>然后是对AppendEntriesRPC的修改</p>
+<p>首先是AppendEntries中的一致性判断，一个leader在刚上位时，它的matchIndex[all]=0，但其他follower的log大概率不是空的（也许经过更新Snapshot的方法导致log变空，但它的新log下标并不是重新从1开始），那么Leader发送的AppendEntries中PrevLogIndex=1；假设follower经历了一次Snapshot，它的log中只保存了index&gt;10的log，那么按照之前的做法，我们会得到follower.log[1].Term=0（因为follower下标为1的log已经被丢弃了），这时leader会认为这个follower的日志跟自己的不一致，那么就引发了错误（这会造成死循环，因为leader不存在term=0的log，它们永远不会匹配成功）</p>
+<p>为了解决这种情况，我们应该要在AppendEntriesRPC的一致性判断中加入一个条件。</p>
+<p>即如果args.PrevLogIndex&lt;rf.lastIncludedIndex，那么就应当认为这个follower在PrevLogIndex之前的log全部与leader一致（保存为Snapshot的log的一致性已经被确认过了）</p>
+<p>在完成了AppendEntries的一致性判断后，我们还需要更改prevLogIndex，否则后续的Append过程会由于 rf.log[prevLogIndex+1].Term≠leader.log[prevLogIndex,导致follower的log被全部清空，所以在执行append之前需要修改一下prevLogIndex</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F;确保在后续append过程中，不会有空log参与判断</span><br><span class="line">prevLogIndex:&#x3D;max(args.PrevLogIndex,max(rf.lastIncludedIndex,args.LeaderLastIncludedIndex))</span><br></pre></td></tr></table></figure>
+
+<p>在完成以上修改后，我们发现一个共性，那就是这些问题都是由于更新Snapshot时丢弃了旧Log，但raft仍然使用discardLog.Term，导致出错。</p>
+<p>那么我们是不是想一些更简单的做法，比如在一个新的leader上任时，使它的所有<strong>matchIndex=leader.LastIncludedIndex</strong>，这样传入AppendEntriesRPC的prevLogIndex对应的log就不会是空值了。</p>
+<p>到这里，lab3B的解析终于结束了，事实我在整个lab中，花费在lab3B的时间应该是最多的（一部分原因是因为那段时间划水严重），不断的debug，每天看着满屏的日志信息都头大，但是最终还是把遇到的bug一个个解决掉了（可能？），建议大家在遇到头大的bug的时候不要硬刚，可以做点其他事情（无限活力！！！）放松一下，不然很容易陷入焦躁，但是却完全改不出bug的困境中。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/03/12/mit6-824-lab3-kvraft/" rel="prev" title="MIT-6.824-lab3A-kvraft">
+      <i class="fa fa-chevron-left"></i> MIT-6.824-lab3A-kvraft
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/04/10/mit-6-824-4a-shardmaster/" rel="next" title="MIT-6.824-lab4A-The Shard Master">
+      MIT-6.824-lab4A-The Shard Master <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="wwow"
+      src="/uploads/avatar.png">
+  <p class="site-author-name" itemprop="name">wwow</p>
+  <div class="site-description" itemprop="description">努力不一定会成功，但不努力真的很舒服</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">19</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">wwow</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

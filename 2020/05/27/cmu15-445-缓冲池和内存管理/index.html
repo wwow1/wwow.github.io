@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.1.1">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"yoursite.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="Bifurcated environment（分叉环境？） 以上是目前许多公司的标准配置，它们有前端的OLTP数据库以及后端大型数据仓库，前端的OLTP数据库通常会被称为Data silo（数据孤岛，即相互独立的数据存储区），因为我们可以对其中一个数据库实例进行许多更新操作，并将其应用到此处的单个逻辑数据库中（Data silo），但这些前端数据库之间不会互相交流，它们每一个都是独立于其他数据库的">
+<meta property="og:type" content="article">
+<meta property="og:title" content="CMU15-445学习笔记-缓冲池和内存管理">
+<meta property="og:url" content="http://yoursite.com/2020/05/27/cmu15-445-%E7%BC%93%E5%86%B2%E6%B1%A0%E5%92%8C%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86/index.html">
+<meta property="og:site_name" content="wwow&#39;s blog">
+<meta property="og:description" content="Bifurcated environment（分叉环境？） 以上是目前许多公司的标准配置，它们有前端的OLTP数据库以及后端大型数据仓库，前端的OLTP数据库通常会被称为Data silo（数据孤岛，即相互独立的数据存储区），因为我们可以对其中一个数据库实例进行许多更新操作，并将其应用到此处的单个逻辑数据库中（Data silo），但这些前端数据库之间不会互相交流，它们每一个都是独立于其他数据库的">
+<meta property="og:locale">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/XJRL5GX_J66T7V_CE9P.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/WQE5_JXZ292WJKD6A.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/NWWFU_B_T4QB785_P.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/F89Y6Y7P57WMX8HP4YP3.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/RF2CJHRBE2CEXP_8PWZU.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/NC6N1NLF7Z_FXJ@FL.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/H@3JVQL0ASG4XEK4S79X.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/CAXCBAHB9J@FYOMB4O.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/7NWX00KUYA1QYNO2V.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/IZQB2XL373VQSVK9BGC.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/83VN5HZPPNDV796RAQBQ.png">
+<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/ZU0HW7EIYOVCWJ4W7WG.png">
+<meta property="article:published_time" content="2020-05-27T15:04:31.000Z">
+<meta property="article:modified_time" content="2020-08-30T04:04:08.499Z">
+<meta property="article:author" content="wwow">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/XJRL5GX_J66T7V_CE9P.png">
+
+<link rel="canonical" href="http://yoursite.com/2020/05/27/cmu15-445-%E7%BC%93%E5%86%B2%E6%B1%A0%E5%92%8C%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-Hans'
+  };
+</script>
+
+  <title>CMU15-445学习笔记-缓冲池和内存管理 | wwow's blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">wwow's blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/05/27/cmu15-445-%E7%BC%93%E5%86%B2%E6%B1%A0%E5%92%8C%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/uploads/avatar.png">
+      <meta itemprop="name" content="wwow">
+      <meta itemprop="description" content="努力不一定会成功，但不努力真的很舒服">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="wwow's blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          CMU15-445学习笔记-缓冲池和内存管理
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-05-27 23:04:31" itemprop="dateCreated datePublished" datetime="2020-05-27T23:04:31+08:00">2020-05-27</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-08-30 12:04:08" itemprop="dateModified" datetime="2020-08-30T12:04:08+08:00">2020-08-30</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/cmu15-445/" itemprop="url" rel="index"><span itemprop="name">cmu15-445</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h3 id="Bifurcated-environment（分叉环境？）"><a href="#Bifurcated-environment（分叉环境？）" class="headerlink" title="Bifurcated environment（分叉环境？）"></a>Bifurcated environment（分叉环境？）</h3><p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/XJRL5GX_J66T7V_CE9P.png"></p>
+<p>以上是目前许多公司的标准配置，它们有前端的OLTP数据库以及后端大型数据仓库，前端的OLTP数据库通常会被称为Data silo（数据孤岛，即相互<strong>独立</strong>的数据存储区），因为我们可以对其中一个数据库实例进行许多更新操作，并将其应用到此处的单个逻辑数据库中（Data silo），但这些前端数据库之间不会互相交流，它们每一个都是独立于其他数据库的一个“孤岛”。</p>
+<p>从前端的OLTP数据库中得到数据后，我们会进行一种称为ETL（ETL是将业务系统的数据经过抽取，清洗转换后加载到数据仓库的过程）的操作，然后在数据仓库（OLAP数据库）中对这些数据进行分析，最后将分析得到的新信息再返回给OLTP数据库，通过OLTP数据库将这些新信息向外暴露。</p>
+<p>HTAP（上节课提到的一种混合模式的workload）的理念是，让前端的OLTP数据库也能够完成一些原先在OLAP端所做的分析行为。但我们仍然需要后端的大型数据仓库（OLAP），因为前端的OLTP数据库只能根据自己所拥有的数据进行少量分析行为，且由于它们互相之间是“孤岛”，所以我们只能在后端的数据仓库中看到<strong>所有</strong>的OLTP数据库中的数据，并对它们一起进行分析。</p>
+<h3 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h3><p>数据库无法直接在磁盘上进行操作，由于冯诺伊曼架构，我们只能对内存中的数据进行读写，所以这节课我们会学习我们如何将磁盘中的数据库文件或是page放到内存中，以便我们能够对它们进行操作。</p>
+<p>我们希望能够去支持超出我们内存容量大小的数据库，同时也希望能够最小化磁盘执行查询速度缓慢带来的影响，我们希望这些操作就像在内存中进行的那样。</p>
+<p>我们可以从空间和时间的管理上来思考这个问题。</p>
+<h3 id="空间管理"><a href="#空间管理" class="headerlink" title="空间管理"></a>空间管理</h3><p>空间管理是指我们将数据写入在磁盘的什么地方，依照磁盘的特性，我们希望尽可能的将经常使用的page连续的存放，当我们对这些page读写的时候，由于它们的物理位置彼此靠近，我们就无须花费过多时间用于查找它们在磁盘上的位置。</p>
+<h3 id="时间管理"><a href="#时间管理" class="headerlink" title="时间管理"></a>时间管理</h3><p>时间管理指我们在什么时候将page读入内存，另一方面，当这些page被修改后，我们也需要将它们写回磁盘，我们需要决定何时执行这些操作。</p>
+<p>总而言之，我们希望最小化将数据库存放在磁盘给我们带来的许多负面影响。</p>
+<h3 id="执行流程"><a href="#执行流程" class="headerlink" title="执行流程"></a>执行流程</h3><p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/WQE5_JXZ292WJKD6A.png"></p>
+<p>前面两节课我们讨论了如何在磁盘中表示数据，现在我们要讨论图中内存中的Buffer Pool这一部分。当上层请求读取page2时，我们会同过page目录找到page2，并将其送入内存。但是我们的内存容量是远小于外存的，必然会出现Buffer Pool已满，但是我们仍然需要向磁盘中读入新的page这种情况。这时我们就需要将一些在Buffer Pool中的page写出，这样就能够有空闲的空间读入新的page。</p>
+<p>这就要求我们需要决定对那些page执行写出操作，这是今天这节课的重点讨论内容。</p>
+<h3 id="Buffer-Pool管理器"><a href="#Buffer-Pool管理器" class="headerlink" title="Buffer Pool管理器"></a>Buffer Pool管理器</h3><p>Buffer Pool需要系统分配一块很大的内存空间，因此才能够将page从磁盘中读入。但是注意，这一块内存空间是完全由数据库系统来控制的，而不是OS。</p>
+<p>我们将这块大的内存空间分成一个个固定大小的chunk，它被称为frame。我们会将从磁盘中读入的一个page放入一个frame中，我个人认为frame是内存中的页框，专门用于装入page。</p>
+<p>当数据库请求得到一个page时，Buffer Pool具体做了哪些事呢？</p>
+<p>首先是查看Buffer Pool中是否存在这个page，如果存在那就直接将它的指针提交给上层；如果不存在就需要到磁盘中拷贝一份数据放入内存中。这个过程中不会对数据进行任何的序列化处理，数据在磁盘中是怎样的，那么它在内存中就是怎样的。</p>
+<h4 id="定位内存中的page"><a href="#定位内存中的page" class="headerlink" title="定位内存中的page"></a>定位内存中的page</h4><p>和在磁盘中遇到的一样，我们如何在内存中找到想要的page的位置呢？</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/NWWFU_B_T4QB785_P.png"></p>
+<p>我们同样使用一个额外的indirection层来保存一个映射关系，即page表（注意跟磁盘中的page目录做一个区分），page表是一个hash表，通过它来跟踪内存中的page，我们可以根据page表和pageId来定位某个page存放在哪个frame中。</p>
+<p>我们需要使用一些元数据来跟踪对于内存中page的操作，这里说以下Dirty Flag和Pin/Reference Counter</p>
+<h4 id="Dirty-Flag"><a href="#Dirty-Flag" class="headerlink" title="Dirty Flag"></a>Dirty Flag</h4><p>前面提到，当Buffer Pool满时我们需要换出一些page来将一些内存空间空出来给新的page。那么对于在内存中没有被修改的page，我们可以直接将它丢弃，这不会影响正确性，且减少了I/O操作，提高了性能。但是对于在内存中遭到修改的page，我们必须要将它们写回磁盘中，否则就会造成数据的缺失。</p>
+<p>为了确认哪些page在内存中被修改，我们使用Dirty Flag对被修改的page进行一个标记。</p>
+<h4 id="Pin-Reference-Counter"><a href="#Pin-Reference-Counter" class="headerlink" title="Pin/Reference Counter"></a>Pin/Reference Counter</h4><p>这个元数据用于追踪使用该page的当前线程数量或是正在查询这个page的线程数，如果当前有线程在使用或查询该page，我们就不应该将它丢弃或是写回磁盘中，这种时候我们可以在page表中为这一项page加一个latch（锁）。</p>
+<p>我们还需要额外去做一些事情来跟踪哪些page被修改了，上述两者只是其中的一部分，我们可能还需要追踪时谁修改了page。</p>
+<p>上述内容可以很好的解释我们在数据库存储中说到的，为什么不适用OS（mmap）来帮我们进行内存管理？ 因为也许OS会提前将我们仍需要使用的page写出到磁盘中。</p>
+<h4 id="Locks-vs-Latchs"><a href="#Locks-vs-Latchs" class="headerlink" title="Locks vs Latchs"></a>Locks vs Latchs</h4><p>为了防止混淆，我们做以下lock和latch的区分。</p>
+<p>在数据库中，lock是更高级的逻辑原语，它用于保护数据库中的逻辑内容（如tuple，表，数据库），事务在运行时会持有lock，来支持并发操作同时保证操作的正确性。lock的内容是暴露给开发人员的，我们可以在运行查询时看到持有的是哪种lock。</p>
+<p>latch是一种底层保护原语，它用来保护数据库内部的内容，例如保护数据结构和内存区域。在我们执行操作时会持有latch来保护某些东西，例如当我修改page表的内容时，我会在要修改的地方加一个latch，在修改后再将它释放。当我们使用latch时，不需要担心回滚操作。因为它是内部的东西，它会去更新数据库系统的物理数据结构，当我进行修改时，如果没能拿到对应的latch，那我就会终止操作，而不用担心回滚的问题。关于回滚的内容会在后续的并发控制的课上详细说明。</p>
+<h4 id="page表-vs-page目录"><a href="#page表-vs-page目录" class="headerlink" title="page表 vs page目录"></a>page表 vs page目录</h4><p>同样的，来区分以下page表和page目录。</p>
+<p>page目录的作用是用来找到page在磁盘上的位置。我们对page目录所作的修改都必须持久化，它们必须被写到磁盘中，即使系统崩溃了，在恢复之后我们也能知道从哪里找到我们的page。</p>
+<p>page表是内存中的映射，它将pageId映射到它们在Buffer Pool中frame的位置。它是一个暂时的东西，我们无须将它持久化保存在磁盘中。</p>
+<h4 id="内存分配策略"><a href="#内存分配策略" class="headerlink" title="内存分配策略"></a>内存分配策略</h4><p><strong>全局策略</strong>中我们所作的策略是对全局有利的，我们会查看所有运行的查询和事务，再决定某个内容是否应该存储在内存中。</p>
+<p><strong>局部策略</strong>是针对单个查询或事务来说，我们尝试使用对它有利的分配方式，但这对其他查询和事务来说也许是非常不利的。</p>
+<p>这两种策略没有优劣之分，根据实际情况来选择分配策略，在很多时候我们也希望对两种策略做一个折中处理。</p>
+<h4 id="Buffer-Pool优化"><a href="#Buffer-Pool优化" class="headerlink" title="Buffer Pool优化"></a>Buffer Pool优化</h4><p>接下来我们详细的讨论如何优化我们的Buffer Pool，让它变得更加高效。</p>
+<h5 id="1-multiple-Buffer-Pool（多缓冲池）"><a href="#1-multiple-Buffer-Pool（多缓冲池）" class="headerlink" title="1.multiple Buffer Pool（多缓冲池）"></a>1.multiple Buffer Pool（多缓冲池）</h5><p>之前的例子中，我们都把Buffer Pool作为单个实体，但事实上我们可以拥有多个Buffer Pool，我们分配不同内存区域，每一个内存区域都有自己的一套pageId与frame的映射关系。</p>
+<p>我们希望使用多个Buffer Pool的原因是我们可以在每个Buffer Pool根据存储数据的不同来定制不同的局部分配策略。例如我们可以让一个Buffer Pool来处理索引，另一个Buffer Pool来处理表，它们的访问模式和策略都不相同。显然，如果我们使用一个大的Buffer Pool来替代多个Buffer Pool，我们就不可能使用不同的分配策略了。</p>
+<p>另一方面，使用多个Buffer Pool可以减少试图访问Buffer Pool的多个线程间争夺同一个latch的情况发生。因为我们拥有多个page表，在同一时间内不同线程可以访问不同的page表，这样就可以减少争夺latch的情况。</p>
+<p>如何确定page在哪个Buffer Pool中？</p>
+<p><strong>Object Id</strong></p>
+<p>第一种方法是将page的record id保存到一个列表中，然后就能够根据record id找到对应的对象在何处（保存record id和位置的一一映射关系）。</p>
+<p><strong>Hashing</strong></p>
+<p>第二种方法是对传入record id进行hash，并使用record id对n（Buffer Pool的数量）进行取模，这就能快速得到数据的存放位置。</p>
+<h5 id="2-Pre-Fetching（预读）"><a href="#2-Pre-Fetching（预读）" class="headerlink" title="2.Pre-Fetching（预读）"></a>2.Pre-Fetching（预读）</h5><p>由于磁盘和内存处理速度的不匹配，我们希望尽可能减少从磁盘读入数据所带来的影响。举例说，对于一个要求全局遍历的查询请求之前，我们会从page0读入内存，当page0的数据全部处理完之后，再读入page1，处理page1的数据，再读取page2…</p>
+<p>这种情况下，我们在解析查询请求的时候就知道了哪些page需要读入内存，也许我们能够在CPU处理数据时，让I/O去读下一个page（比如说处理机处理page0的数据时，I/O就去读page1的数据），做到处理机和I/O的并行操作，这样就能减少从磁盘读入数据带来的高额时间成本，同时降低整个查询的执行时间。</p>
+<p>这个例子十分简单，实际上OS的mmap就能够做到提前读入下一个page（因为上例中的page之间本就是连续的）。</p>
+<p>但是考虑一些复杂的情况，OS就不知道如何去预读page，但数据库可以。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/F89Y6Y7P57WMX8HP4YP3.png"></p>
+<p>如上图，我们要读取所有value值在100~250之间的tuple，我们可以在value上添加一个索引，在索引中记录了不同value的tuple所存放的位置，我们可以通过使用以上的索引结构来找到想要的page。</p>
+<p>这些page在物理上的存储位置可能是非连续的（如图中的page3和page5），但是在有了索引之后我们就能够找到它们，并且完成预读。但是在这种情况下OS就无法进行正确的预读，因为我们想要的page是非连续的，它不理解查询的上下文语义，它不会知道为什么在预读了page3之后应该预读page5而不是page4。</p>
+<h5 id="3-Scan-Sharing（扫描共享）"><a href="#3-Scan-Sharing（扫描共享）" class="headerlink" title="3.Scan Sharing（扫描共享）"></a>3.Scan Sharing（扫描共享）</h5><p>首先说明以下，在某一个查询请求中，我们顺序扫描磁盘的page的时候，有一个游标，它一开始指向page0，当page0读出时它再指向page1，以此类推…..它会记录刚才扫描过的位置，这样我们在顺序扫描的时候就不用每次都从头再来。</p>
+<p>对于扫描共享而言，它可以认为是不同查询请求之间互相搭顺风车，即后来的请求可以与先来的请求共享游标。</p>
+<p>在扫描共享中，共享游标的查询请求不需要完全相同，只要两者都需要读取相同的page，它们就能够进行扫描共享。</p>
+<p>扫描共享的大致流程为: DBMS工作后，某个查询A开始了一次扫描，过了一小段时间，查询B也开始了，查询B意识到它要扫描的page与A大致相同，这样它就可以把自己附加到查询A的游标上，当查询A拿到page时，查询B也会收到通知，所以查询B也可以去取数据。有一点需要注意的是，在B搭上顺风车之前，A可能已经读完了前面的一些page，但B现在漏读了这些page，所以最后B要从上顺风车的位置开始，逆向的扫描一开始漏掉的page。</p>
+<p>我们据一个示例来具体说明：</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/RF2CJHRBE2CEXP_8PWZU.png"></p>
+<p>如上图所示，一开始查询Q1开始执行，它要读取表A的全部内容，它现在读到了page3.</p>
+<p>这时查询Q2出现了，它也需要读取表A的全部内容。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/NC6N1NLF7Z_FXJ@FL.png"></p>
+<p>不考虑扫描共享的情况，如上图，Q2要读取page0进入内存，但事实上我们刚将page0换出内存，可以想到，这种情况会导致大量page的换入换出，导致两个查询出现争夺内存资源的情况。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/H@3JVQL0ASG4XEK4S79X.png"></p>
+<p>如果我们使用了扫描共享，如上图，这时Q2就应该附加到Q1的游标上，即它也一起去读page3的数据，然后Q1和Q2能够随着Q1的游标继续读取page4，page5，这样就不会出现page不断换入换出的情况。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/CAXCBAHB9J@FYOMB4O.png"></p>
+<p>当Q1,Q2读完page5时，Q1的任务结束了，但Q2还需要从它搭上顺风车的位置（即page3），再回头去读取page2，page1，page0，这样Q2才能完成任务。（如上图）</p>
+<p>（Q1：在查询过程中会产生许多中间结果，如上图中Q2计算平均值就需要记录一些中间数据，这些中间数据是如何存储的？</p>
+<p>A1：这些中间结果也需要存储在内存中，并且它们也是由一个<strong>单独</strong>的Buffer Pool保存的，但这个Buffer Pool是全局的还是私有的取决于具体实现方式。当这些中间结果过大导致内存溢出时，为了保存中间结果，我们也会将Buffer Pool中的page刷出到磁盘，为了保护某些page，我们会使用latch把page”固定住“，告诉管理器这个page还有用，不要将他刷回磁盘。）</p>
+<p>上述Q1,Q2的例子引出了一个关于关系模型的很好的例子。假设上述Q2改为</p>
+<p>SELECT AVG(val) FROM A LIMIT 100,即读出前100条tuple的val并取平均值，对于使用和不使用扫描共享的情况而言，这条语句所返回的结果也可能不同（从page0开始读100条或是从page3开始读100条），但是这样的结果是允许的，因为关系模型是无序的，我们存储的tuple之间没有明确的存放顺序（例如先放入的tuple在前面，后方的tuple在后面这类规则）。</p>
+<p>所以无论我们从哪里开始读100条tuple来计算平均值，无论结果如何不同，它们都可以认为是正确的。</p>
+<h5 id="Buffer-Pool-Bypass"><a href="#Buffer-Pool-Bypass" class="headerlink" title="Buffer Pool Bypass"></a>Buffer Pool Bypass</h5><p>这和刚才说到的存储中间结构的问题相关。当我们<strong>循序扫描</strong>时，需要读入大量的page，其中许多page在短时间内不会再复用，为了防止它们污染缓存，我们首先为每一个执行查询的线程分配一小块内存，当我们从磁盘中读入新的page时，不会将这些page放入buffer pool，而是将它放入线程的本地内存，当这次查询完成时，这些page全部会被丢弃。</p>
+<h3 id="OS-page-cache"><a href="#OS-page-cache" class="headerlink" title="OS page cache"></a>OS page cache</h3><p>OS page cache介于磁盘和操作系统之间。</p>
+<p>我们对于磁盘的操作都是基于OS给我们提供的API（fwrite，fread）进行的，但另一方面OS也会维护自己的文件系统缓存。当数据库从磁盘中读取一个page时，OS也会在它的文件系统缓存中同样保存一份。显然这样做会浪费许多内存空间，大多数数据库系统不希望OS缓存这些page，所以它们通过direct I/O来做，不让文件系统对该数据进行缓存，又数据库自己来管理其中的内容。</p>
+<p>OS page cache虽然会对每一个page多保存一个副本，但是当数据库将某个page做修改后，OS并不会对它保存的page做相应的修改。这样一来，OS保存的那一份page就不能称之为副本了（因为它没有与数据库中的那一份保持一致），它可以被认为是冗余的旧数据。这也是多数数据库系统不适用OS page cache的原因。</p>
+<p>虽然大多数系统不希望这么做，但还是有少量数据库使用了OS page cache，例如postgreSQL。它们这么做可能是通过使用OS提供的服务来降低开发和维护的复杂度。</p>
+<h4 id="Buffer替换策略"><a href="#Buffer替换策略" class="headerlink" title="Buffer替换策略"></a>Buffer替换策略</h4><p>我们之前已经介绍过Buffer Pool的基本工作流程，现在我们要讨论在我想要读取一个page进入磁盘时，Buffer Pool的内存空间却满了的情况下，我们该怎么做。</p>
+<p>对于Buffer替换策略，我们使用以下几点来评价它们的优劣。</p>
+<p><strong>正确性</strong>，当某个内存中的page还未使用完时，它不应该被替换或移除出去。</p>
+<p><strong>准确性</strong>，要确保我们替换出去的都是在短时间内不会用到的page。</p>
+<p><strong>速度</strong>，替换策略需要迅速，因为我们会使用latch来锁定某些page，我们不希望替换策略花费许多时间来找到能够被替换出的page。</p>
+<p><strong>元数据</strong>，我们不希望为了替换策略而维护追踪大量的元数据，不希望保存元数据花费的page甚至大于保存真实数据的page。</p>
+<h5 id="LRU（最近最少使用）"><a href="#LRU（最近最少使用）" class="headerlink" title="LRU（最近最少使用）"></a>LRU（最近最少使用）</h5><p>在这个算法中，我们需要跟踪一个page最后一次被访问时的时间戳，每次我们都替换或移除时间戳最老的page。</p>
+<p>我们可以维护一个数据结构（例如queue），它将page根据时间戳排序，每当某个page被读或写时，就将它从队列中拉出来，再放到队尾。每次需要换出page时，就将队首的page换出内存。</p>
+<h5 id="CLOCK"><a href="#CLOCK" class="headerlink" title="CLOCK"></a>CLOCK</h5><p>这是一种LRU的近似算法，在CLOCK中，我们不去跟踪page最后一次访问的时间戳，我们需要去追踪的信息是每个page的标志位（reference bit），它表示自从上次检查该page后，这个page是否被访问。</p>
+<p>我们将page组织成一个环形的buffer（就像钟一样），使用一个能够旋转的指针不断的移动去检查每个page的标志位是0还是1，如果是0就说明从上一次检查它之后，这个page没有再被某个线程访问，因此我们可以将它从buffer中移除。如果是1，说明上一次检查之后它被某个或某些线程访问了，我们将标志位改为0，继续检查下一个page。</p>
+<p>对于某个page而言，无论它在某个时间段内被多少个线程访问，它的标志位都是置1，而不会因为访问次数增多而累加（不会变成2，3，4，5…）</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/7NWX00KUYA1QYNO2V.png"></p>
+<p>上图中，我们执行CLOCK算法找出要被替换的page，首先是page1，它的ref标志位为1，我们将其改为0，并将指针移到page2检查。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/IZQB2XL373VQSVK9BGC.png"></p>
+<p>发现page2的ref标志位为0，就将page2置换出去。</p>
+<p>再举一个例子。假设这时page1，2，3，4的ref标志位都为1，那么在指针检查完所有page一遍后，所有page的ref全都变为0，这时指针再次回到page1，发现page1的ref位为0，所以将page1置换出去。</p>
+<p>在CLOCK算法中，实际置换出的不一定是<strong>最久未被访问</strong>的page，我们只关注一段时间内未被访问的page，而当有多个page在一段时间内都未被访问时，我们不需精确的找到最久未被访问的那个，只要从中抽出一个page，并将它置换出去就行。</p>
+<h5 id="LRU和CLOCK存在的问题"><a href="#LRU和CLOCK存在的问题" class="headerlink" title="LRU和CLOCK存在的问题"></a>LRU和CLOCK存在的问题</h5><p>在简单的情况下，例如进行点查询（point query）时访问单个数据（例如page），它们的效果都挺好。但是它们都容易受到sequential flooding的影响，sequential flooding即我们的查询请求需要读取<strong>每个</strong>page，这可能会污染我们的page缓存。因为它读取了一堆page，且所有这些page都比我最近缓存的page的时间戳更新，这时LRU或CLOCK算法会将最近使用的page换出，但事实上这个最近使用的page也许是我们之后需要用到的，而真正应该被换出的应该是较新的这些page。</p>
+<p>为了应对这种情况，我们可以选择三种改进的策略。</p>
+<h5 id="LUR-K"><a href="#LUR-K" class="headerlink" title="LUR-K"></a>LUR-K</h5><p>为了解决算法污染问题，LRU-K将“最近使用过1次”的判断标准扩展为“最近使用过K次”。</p>
+<p>相比于LRU，LRU-K算法中的K表示对每个缓存在内存中的page的访问次数进行计数，我们会多维护一个历史队列，来记录所有缓存page的访问历史。当page的访问次数达到K次后才将其放入缓存。当需要置换数据时，LRU-K会淘汰第K次访问时间据现在时间最长的page。</p>
+<p>这种方法通过历史数据的访问时间间隔来预测未来的数据访问规律。</p>
+<p>对于较为复杂的数据库系统来说，它们会采用LRU-K的做法。</p>
+<h5 id="Localization"><a href="#Localization" class="headerlink" title="Localization"></a>Localization</h5><p>这种方法是使用多个buffer pool让查询请求本地化，我们在之前讨论过相关的做法。我们将本次查询所涉及到的page单独放到某一块buffer中，其他查询请求也能读取到它们，但是在我们要替换出page时，我们只会选择在<strong>当前查询请求下访问最少</strong>的page做置换，而不是从全局的角度看谁被访问的次数最少。</p>
+<p>即我们不关心其他查询请求访问了这个page多少次，只要在本次查询请求中它的被访问次数是最少的，那么它就应该被置换出去。</p>
+<h5 id="Priority-Hints"><a href="#Priority-Hints" class="headerlink" title="Priority Hints"></a>Priority Hints</h5><p>我们可以提供一些暗示给buffer Pool来提醒它哪些page是重要的，而哪些page是不重要的。</p>
+<p>这似乎比较抽象，我们给出一个例子来说明。</p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/83VN5HZPPNDV796RAQBQ.png"></p>
+<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/ZU0HW7EIYOVCWJ4W7WG.png"></p>
+<p>对于Q2来说，我们需要从表A中得到id为特定值的tuple。</p>
+<p>当我们使用索引（例如B+树结构），我们在每一次查询时都需要从根节点进入，然后一直向下直到叶节点。假设我们在将叶节点读入内存时，我们的buffer Pool已经满了，这时就需要选择一个内存中的page置换出去，根据最近最少使用的原则，index—page0（也就是根节点）会被置换出去。但是我们知道，当下一次再次出现查询请求时，我们仍然需要使用索引结构，仍然需要从根节点开始查找数据，那么根节点立刻会被再次读入内存。</p>
+<p>我们的priority hint就是在这种情况下，一定不会选择根节点置换出内存，而是选择中间的非叶节点置换出去（即便最近最少原则指向的是根节点）。在特定的环境下，让数据库理解上下文信息，这样它就能够根据这些“hint”来更好的执行置换算法。</p>
+<h4 id="Dirty-page（脏页）"><a href="#Dirty-page（脏页）" class="headerlink" title="Dirty page（脏页）"></a>Dirty page（脏页）</h4><p>在每一个page上会有一个dirty bit，它会告诉我们自从它进入buffer pool后，是否有查询对该page的内容进行了修改。</p>
+<p>当我们执行替换策略时，最好的方法当然是找到一个未被标记为dirty的page，然后将它直接移除，再将新读入的page放到这个frame中。假设我们要换出一个dirty page，在将新的page读入内存之前，我们需要将这个dirty page安全的写回磁盘中。</p>
+<p>这时我们就需要在替换策略上做一个取舍，在dirty page的基础上，我们会更希望找到未被标记为dirty的page，然后直接移除它来空出内存空间，但这些未被标记为dirty的page可能在短时间内会被再次用到，这种情况下也许我会考虑多花一些代价选择一个dirty page置换出去（保留非dirty page）</p>
+<p>这种情况下的取舍是十分困难的，在不同的情景下不同的选择的代价也不同，没有一个绝对的结论告诉我们如何选择。</p>
+<h4 id="Background-Writing（后台写入）"><a href="#Background-Writing（后台写入）" class="headerlink" title="Background Writing（后台写入）"></a>Background Writing（后台写入）</h4><p>要解决Dirty page下页面置换的两难问题，即为了避免<strong>必须立即</strong>将page写出以便在buffer pool释放可用空间的问题，我们可以使用后台写操作。</p>
+<p>我们在数据库系统中创建一个执行定时任务的线程，每隔一段时间它会去buffer pool中找出dirty page，然后将其写出到磁盘上（但是page仍然保留在buffer pool中，只是将修改数据更新到磁盘），这样dirty page就变成clean的了。当我们执行替换策略时，我们就有更多clean page可以直接移除而不用写回磁盘。 不过在这个过程中要注意，在修改的内容尚未写入到日志之前，我们不希望将dirty page写回磁盘。</p>
+<p>这样做的重点在于，我们可以使用在平时闲置的I/O资源来将dirty page写回磁盘，而不是只有在需要被置换时才写回磁盘。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>这节课的重点在于我们要如何去管理内存并做的比OS更好，因为我们知道查询的语义，我们知道page中的内容，我们知道这些数据如何被访问，我们可以使用更多的优化来提高性能和效率。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/05/20/cmu15-445-%E6%95%B0%E6%8D%AE%E5%BA%93%E5%AD%98%E5%82%A8part2/" rel="prev" title="CMU15-445学习笔记-数据库存储part2">
+      <i class="fa fa-chevron-left"></i> CMU15-445学习笔记-数据库存储part2
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/06/16/leetcode%E5%91%A8%E8%B5%9B-6-14/" rel="next" title="Leetcode周赛 6.14">
+      Leetcode周赛 6.14 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#Bifurcated-environment%EF%BC%88%E5%88%86%E5%8F%89%E7%8E%AF%E5%A2%83%EF%BC%9F%EF%BC%89"><span class="nav-number">1.</span> <span class="nav-text">Bifurcated environment（分叉环境？）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%A6%82%E8%BF%B0"><span class="nav-number">2.</span> <span class="nav-text">概述</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%A9%BA%E9%97%B4%E7%AE%A1%E7%90%86"><span class="nav-number">3.</span> <span class="nav-text">空间管理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%97%B6%E9%97%B4%E7%AE%A1%E7%90%86"><span class="nav-number">4.</span> <span class="nav-text">时间管理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%89%A7%E8%A1%8C%E6%B5%81%E7%A8%8B"><span class="nav-number">5.</span> <span class="nav-text">执行流程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Buffer-Pool%E7%AE%A1%E7%90%86%E5%99%A8"><span class="nav-number">6.</span> <span class="nav-text">Buffer Pool管理器</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%AE%9A%E4%BD%8D%E5%86%85%E5%AD%98%E4%B8%AD%E7%9A%84page"><span class="nav-number">6.1.</span> <span class="nav-text">定位内存中的page</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Dirty-Flag"><span class="nav-number">6.2.</span> <span class="nav-text">Dirty Flag</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Pin-Reference-Counter"><span class="nav-number">6.3.</span> <span class="nav-text">Pin&#x2F;Reference Counter</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Locks-vs-Latchs"><span class="nav-number">6.4.</span> <span class="nav-text">Locks vs Latchs</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#page%E8%A1%A8-vs-page%E7%9B%AE%E5%BD%95"><span class="nav-number">6.5.</span> <span class="nav-text">page表 vs page目录</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D%E7%AD%96%E7%95%A5"><span class="nav-number">6.6.</span> <span class="nav-text">内存分配策略</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Buffer-Pool%E4%BC%98%E5%8C%96"><span class="nav-number">6.7.</span> <span class="nav-text">Buffer Pool优化</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#1-multiple-Buffer-Pool%EF%BC%88%E5%A4%9A%E7%BC%93%E5%86%B2%E6%B1%A0%EF%BC%89"><span class="nav-number">6.7.1.</span> <span class="nav-text">1.multiple Buffer Pool（多缓冲池）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#2-Pre-Fetching%EF%BC%88%E9%A2%84%E8%AF%BB%EF%BC%89"><span class="nav-number">6.7.2.</span> <span class="nav-text">2.Pre-Fetching（预读）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#3-Scan-Sharing%EF%BC%88%E6%89%AB%E6%8F%8F%E5%85%B1%E4%BA%AB%EF%BC%89"><span class="nav-number">6.7.3.</span> <span class="nav-text">3.Scan Sharing（扫描共享）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#Buffer-Pool-Bypass"><span class="nav-number">6.7.4.</span> <span class="nav-text">Buffer Pool Bypass</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#OS-page-cache"><span class="nav-number">7.</span> <span class="nav-text">OS page cache</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Buffer%E6%9B%BF%E6%8D%A2%E7%AD%96%E7%95%A5"><span class="nav-number">7.1.</span> <span class="nav-text">Buffer替换策略</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#LRU%EF%BC%88%E6%9C%80%E8%BF%91%E6%9C%80%E5%B0%91%E4%BD%BF%E7%94%A8%EF%BC%89"><span class="nav-number">7.1.1.</span> <span class="nav-text">LRU（最近最少使用）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#CLOCK"><span class="nav-number">7.1.2.</span> <span class="nav-text">CLOCK</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#LRU%E5%92%8CCLOCK%E5%AD%98%E5%9C%A8%E7%9A%84%E9%97%AE%E9%A2%98"><span class="nav-number">7.1.3.</span> <span class="nav-text">LRU和CLOCK存在的问题</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#LUR-K"><span class="nav-number">7.1.4.</span> <span class="nav-text">LUR-K</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#Localization"><span class="nav-number">7.1.5.</span> <span class="nav-text">Localization</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#Priority-Hints"><span class="nav-number">7.1.6.</span> <span class="nav-text">Priority Hints</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Dirty-page%EF%BC%88%E8%84%8F%E9%A1%B5%EF%BC%89"><span class="nav-number">7.2.</span> <span class="nav-text">Dirty page（脏页）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Background-Writing%EF%BC%88%E5%90%8E%E5%8F%B0%E5%86%99%E5%85%A5%EF%BC%89"><span class="nav-number">7.3.</span> <span class="nav-text">Background Writing（后台写入）</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number"></span> <span class="nav-text">总结</span></a></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="wwow"
+      src="/uploads/avatar.png">
+  <p class="site-author-name" itemprop="name">wwow</p>
+  <div class="site-description" itemprop="description">努力不一定会成功，但不努力真的很舒服</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">19</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">wwow</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
