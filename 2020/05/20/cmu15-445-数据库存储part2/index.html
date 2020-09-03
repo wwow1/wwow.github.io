@@ -1,231 +1,199 @@
 <!DOCTYPE html>
 <html lang="zh-Hans">
 <head>
-  <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
-<meta name="theme-color" content="#222">
-<meta name="generator" content="Hexo 5.1.1">
-  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
-  <link rel="mask-icon" href="/images/logo.svg" color="#222">
-
+    <meta charset="UTF-8">
+    <meta http-equiv="Cache-Control" content="no-siteapp">
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+    
+    <meta name="renderer" content="webkit"/>
+    <meta name="force-rendering" content="webkit"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
+    <script>if (/*@cc_on!@*/false || (!!window.MSInputMethodContext && !!document.documentMode)) window.location.href="https://support.dmeng.net/upgrade-your-browser.html?referrer="+encodeURIComponent(window.location.href); </script>
+    
+    
+        <link rel="shortcut icon" href="/images/favicon.ico">
+    
+     
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/5.13.1/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/vuetify@2.2.30/dist/vuetify.min.css" rel="stylesheet">
+    
 <link rel="stylesheet" href="/css/main.css">
 
-
-<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
-
-<script id="hexo-configurations">
-    var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"yoursite.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
-  </script>
-
-  <meta name="description" content="面向磁盘型数据库系统page布局log-structured上节课我们在讲到page布局时说到了tuple-oriented的方式，使用slotted page的方法将每一个tuple对应的偏移量保存在slot中，这样就能在定位到tuple在page内部的位置。这节课将会补充说明另外一种log-structured方法。 这种组织方式不是将所有tuple存放在page内，而是去存储这些与创建tup">
-<meta property="og:type" content="article">
-<meta property="og:title" content="CMU15-445学习笔记-数据库存储part2">
-<meta property="og:url" content="http://yoursite.com/2020/05/20/cmu15-445-%E6%95%B0%E6%8D%AE%E5%BA%93%E5%AD%98%E5%82%A8part2/index.html">
-<meta property="og:site_name" content="wwow&#39;s blog">
-<meta property="og:description" content="面向磁盘型数据库系统page布局log-structured上节课我们在讲到page布局时说到了tuple-oriented的方式，使用slotted page的方法将每一个tuple对应的偏移量保存在slot中，这样就能在定位到tuple在page内部的位置。这节课将会补充说明另外一种log-structured方法。 这种组织方式不是将所有tuple存放在page内，而是去存储这些与创建tup">
-<meta property="og:locale">
-<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/A1RC090MJI4LMOEA@U.png">
-<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/LL5CTSZNWS8QUP7F0C9.png">
-<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/74VPNL9FMFJDGJQX22.png">
-<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/FS6JFPWQMJ64PFZ5Q5BE.png">
-<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/ROPOTIGFQVK5O61RP0Y.png">
-<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/3YPWWCCMT__TLDS9FJE.png">
-<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/14SWR3PFWQXPZ5H50NAG.png">
-<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/DB6OZH9J2H0VRZBWO7.png">
-<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/OYDFSCHSBF_A6U5V_BC.png">
-<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/0_TOTHQYU6B6BDL_4U.png">
-<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/TABJOLPNBG_VVPNNXC.png">
-<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/LOCXWKSDB4PESV7PCX0.png">
-<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/G6W_S2VGOO@GURKGHTKP.png">
-<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/BO0O2JTCANVOAO90.png">
-<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/E2R4NIZQ2@N_MVBGVU.png">
-<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/QEYKSEYUL736A_STI7N5B.png">
-<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/NZRLABY__QWY50VNKC@T9E.png">
-<meta property="article:published_time" content="2020-05-20T10:01:10.000Z">
-<meta property="article:modified_time" content="2020-08-30T04:03:24.315Z">
-<meta property="article:author" content="wwow">
-<meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/05/A1RC090MJI4LMOEA@U.png">
-
-<link rel="canonical" href="http://yoursite.com/2020/05/20/cmu15-445-%E6%95%B0%E6%8D%AE%E5%BA%93%E5%AD%98%E5%82%A8part2/">
-
-
-<script id="page-configurations">
-  // https://hexo.io/docs/variables.html
-  CONFIG.page = {
-    sidebar: "",
-    isHome : false,
-    isPost : true,
-    lang   : 'zh-Hans'
-  };
-</script>
-
-  <title>CMU15-445学习笔记-数据库存储part2 | wwow's blog</title>
-  
-
-
-
-
-
-
-  <noscript>
-  <style>
-  .use-motion .brand,
-  .use-motion .menu-item,
-  .sidebar-inner,
-  .use-motion .post-block,
-  .use-motion .pagination,
-  .use-motion .comments,
-  .use-motion .post-header,
-  .use-motion .post-body,
-  .use-motion .collection-header { opacity: initial; }
-
-  .use-motion .site-title,
-  .use-motion .site-subtitle {
-    opacity: initial;
-    top: initial;
-  }
-
-  .use-motion .logo-line-before i { left: initial; }
-  .use-motion .logo-line-after i { right: initial; }
-  </style>
-</noscript>
-
-</head>
-
-<body itemscope itemtype="http://schema.org/WebPage">
-  <div class="container use-motion">
-    <div class="headband"></div>
-
-    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
-      <div class="header-inner"><div class="site-brand-container">
-  <div class="site-nav-toggle">
-    <div class="toggle" aria-label="切换导航栏">
-      <span class="toggle-line toggle-line-first"></span>
-      <span class="toggle-line toggle-line-middle"></span>
-      <span class="toggle-line toggle-line-last"></span>
-    </div>
-  </div>
-
-  <div class="site-meta">
-
-    <a href="/" class="brand" rel="start">
-      <span class="logo-line-before"><i></i></span>
-      <h1 class="site-title">wwow's blog</h1>
-      <span class="logo-line-after"><i></i></span>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+              
+    
+    
+    
+    
+    
+    <title>
+        
+            CMU15-445学习笔记-数据库存储part2 | wwow&#39;s blog
+        
+    </title>
+    
+    
+<meta name="generator" content="Hexo 5.1.1"></head>
+<body>
+    <div id="app">
+        <v-app>
+            <v-content id="page">
+                <v-container fluid>
+                    <v-row>
+                        <v-col cols="2" class="d-none d-md-block">
+                            <div id="sidebar" class="float-right">
+    <a href="/" rel="home">
+        <v-avatar size=96>
+            <img id="logo" src="/images/avatar.webp">     
+        </v-avatar> 
     </a>
-  </div>
-
-  <div class="site-nav-right">
-    <div class="toggle popup-trigger">
+    <v-divider></v-divider>
+    <div class="mini-menu">
+        <v-btn icon href="/">
+            <v-icon>home</v-icon>
+        </v-btn>
+        <v-btn icon href="/categories/">
+            <v-icon>folder</v-icon>
+        </v-btn>
+        <v-btn icon href="/tags/">
+            <v-icon>bookmark</v-icon>
+        </v-btn>
+        <v-btn icon @click="SetNightMode">
+            <v-icon>{{ nightMode }}</v-icon>
+        </v-btn>
     </div>
-  </div>
-</div>
-
-
-
-
-<nav class="site-nav">
-  <ul id="menu" class="main-menu menu">
-        <li class="menu-item menu-item-home">
-
-    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
-
-  </li>
-        <li class="menu-item menu-item-categories">
-
-    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
-
-  </li>
-        <li class="menu-item menu-item-archives">
-
-    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
-
-  </li>
-  </ul>
-</nav>
-
-
-
-
-</div>
-    </header>
-
-    
-  <div class="back-to-top">
-    <i class="fa fa-arrow-up"></i>
-    <span>0%</span>
-  </div>
-
-
-    <main class="main">
-      <div class="main-inner">
-        <div class="content-wrap">
-          
-
-          <div class="content post posts-expand">
+    <v-list id="main-menu" class="font-weight-bold" flat>
+        
             
-
+            <v-list-item href="/archives/" link>
+            <v-list-item-icon><v-icon>archive</v-icon></v-list-item-icon>
+            <v-list-item-content>
+                Archives
+            </v-list-item-content>
+            </v-list-item>
+        
+    </v-list>
+    <v-divider></v-divider>
     
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/05/20/cmu15-445-%E6%95%B0%E6%8D%AE%E5%BA%93%E5%AD%98%E5%82%A8part2/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/uploads/avatar.png">
-      <meta itemprop="name" content="wwow">
-      <meta itemprop="description" content="努力不一定会成功，但不努力真的很舒服">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="wwow's blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          CMU15-445学习笔记-数据库存储part2
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-05-20 18:01:10" itemprop="dateCreated datePublished" datetime="2020-05-20T18:01:10+08:00">2020-05-20</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-08-30 12:03:24" itemprop="dateModified" datetime="2020-08-30T12:03:24+08:00">2020-08-30</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/cmu15-445/" itemprop="url" rel="index"><span itemprop="name">cmu15-445</span></a>
-                </span>
-            </span>
-
-          
-
+        <div class="post-toc">
+            <a href="/2020/05/20/cmu15-445-%E6%95%B0%E6%8D%AE%E5%BA%93%E5%AD%98%E5%82%A8part2/" class="toc-header">Table of Contents</a>
+            <div class="toc-content">
+                <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%9D%A2%E5%90%91%E7%A3%81%E7%9B%98%E5%9E%8B%E6%95%B0%E6%8D%AE%E5%BA%93%E7%B3%BB%E7%BB%9F"><span class="toc-number">1.</span> <span class="toc-text">面向磁盘型数据库系统</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#page%E5%B8%83%E5%B1%80"><span class="toc-number">1.1.</span> <span class="toc-text">page布局</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#log-structured"><span class="toc-number">1.1.1.</span> <span class="toc-text">log-structured</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%BD%BF%E7%94%A8tuple%E8%A1%A8%E7%A4%BA%E6%95%B0%E6%8D%AE"><span class="toc-number">1.2.</span> <span class="toc-text">使用tuple表示数据</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#%E6%B5%AE%E7%82%B9%E6%95%B0%EF%BC%88float-real%EF%BC%89%E5%92%8C%E5%AE%9A%E7%82%B9%E6%95%B0%EF%BC%88decimal-numeric%EF%BC%89%E5%AF%B9%E6%AF%94"><span class="toc-number">1.2.1.</span> <span class="toc-text">浮点数（float&#x2F;real）和定点数（decimal&#x2F;numeric）对比</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%AD%98%E5%82%A8%E4%B8%80%E4%B8%AA%E8%BF%87%E5%A4%A7%E7%9A%84%E6%95%B0%E6%8D%AE"><span class="toc-number">1.3.</span> <span class="toc-text">存储一个过大的数据</span></a><ol class="toc-child"><li class="toc-item toc-level-5"><a class="toc-link" href="#overflow-page"><span class="toc-number">1.3.0.1.</span> <span class="toc-text">overflow page</span></a></li><li class="toc-item toc-level-5"><a class="toc-link" href="#%E5%A4%96%E9%83%A8%E5%AD%98%E5%82%A8"><span class="toc-number">1.3.0.2.</span> <span class="toc-text">外部存储</span></a></li></ol></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#system-catalog"><span class="toc-number">1.4.</span> <span class="toc-text">system catalog</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%AD%98%E5%82%A8%E6%A8%A1%E5%9E%8B"><span class="toc-number">1.5.</span> <span class="toc-text">存储模型</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#workload"><span class="toc-number">1.5.1.</span> <span class="toc-text">workload</span></a><ol class="toc-child"><li class="toc-item toc-level-5"><a class="toc-link" href="#OLTP%EF%BC%88On-line-Transaction-Processing%EF%BC%89"><span class="toc-number">1.5.1.1.</span> <span class="toc-text">OLTP（On-line Transaction Processing）</span></a></li><li class="toc-item toc-level-5"><a class="toc-link" href="#OLAP%EF%BC%88On-line-Analytical-Processing"><span class="toc-number">1.5.1.2.</span> <span class="toc-text">OLAP（On-line Analytical Processing)</span></a></li><li class="toc-item toc-level-5"><a class="toc-link" href="#OLTP%E4%B8%8EOLAP%E7%9A%84%E5%AF%B9%E6%AF%94"><span class="toc-number">1.5.1.3.</span> <span class="toc-text">OLTP与OLAP的对比</span></a></li></ol></li><li class="toc-item toc-level-4"><a class="toc-link" href="#n-ary%E5%AD%98%E5%82%A8%E6%A8%A1%E5%9E%8B%EF%BC%88%E8%A1%8C%E5%AD%98%E5%82%A8%E6%A8%A1%E5%9E%8B%EF%BC%89"><span class="toc-number">1.5.2.</span> <span class="toc-text">n-ary存储模型（行存储模型）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#column%E5%AD%98%E5%82%A8%E6%A8%A1%E5%9E%8B%EF%BC%88%E5%88%97%E5%AD%98%E5%82%A8%E6%A8%A1%E5%9E%8B%EF%BC%89"><span class="toc-number">1.5.3.</span> <span class="toc-text">column存储模型（列存储模型）</span></a><ol class="toc-child"><li class="toc-item toc-level-5"><a class="toc-link" href="#%E5%8E%8B%E7%BC%A9%E6%95%B0%E6%8D%AE"><span class="toc-number">1.5.3.1.</span> <span class="toc-text">压缩数据</span></a></li><li class="toc-item toc-level-5"><a class="toc-link" href="#%E5%AE%9A%E4%BD%8Dtuple%E7%9A%84%E5%B1%9E%E6%80%A7"><span class="toc-number">1.5.3.2.</span> <span class="toc-text">定位tuple的属性</span></a></li></ol></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%80%BB%E7%BB%93"><span class="toc-number">1.6.</span> <span class="toc-text">总结</span></a></li></ol></li></ol>
+            </div>
         </div>
-      </header>
+    
+
+    <div id="footer">
+        <div class="footer-social">
+            
+                
+                <v-btn icon href="https://github.com/wwow1" target="_blank">
+                    <v-icon>fab fa-github</v-icon>
+                </v-btn>
+            
+        </div>
+        <v-divider></v-divider>
+        <div class="footer-content">
+            
+                <span id="busuanzi_container_site_uv" style="display: none;"> 
+                    Total Visitors <span id="busuanzi_value_site_uv"></span>
+                </span>
+                <br>
+            
+            <span>Theme: <a target="_blank" rel="noopener" href="https://github.com/kb1000fx/hexo-theme-insulin">Insulin</a></span><br>
+            <span>Powered by <a target="_blank" rel="noopener" href="https://hexo.io/">Hexo</a></span><br>
+            <span>
+                &copy; 2015 - 2020 
+                wwow
+            </span>
+        </div>
+    </div>
+</div>
+
+                        </v-col>
+                        <v-col cols="12" md="10">
+                            <v-row>
+  <v-col cols="12" md="8" align-self="end">
+    <div id="site-header">
+      <div id="site-title">
+        <a href="/" rel="home">wwow&#39;s blog</a>
+      </div>
+      <div id="site-description">努力不一定会成功，但不努力真的很舒服</div>
+      <div id="mobile-menu" class="d-block d-md-none">
+        <v-text-field label="请输入关键字" data-src="search.xml" v-model="searchHeaderValue" prepend-inner-icon="search" clearable clear-icon="clear" @keydown.enter="EnterSearch(searchHeaderValue,false)"></v-text-field>
+        <div class="mobile-mini-menu">
+          <v-btn icon href="/">
+              <v-icon>home</v-icon>
+          </v-btn>
+          <v-btn icon href="/categories/">
+              <v-icon>folder</v-icon>
+          </v-btn>
+          <v-btn icon href="/tags/">
+              <v-icon>bookmark</v-icon>
+          </v-btn>
+          <v-btn icon @click="SetNightMode">
+              <v-icon>{{ nightMode }}</v-icon>
+          </v-btn>
+          
+            
+            <v-btn icon href="/archives/">
+              <v-icon>archive</v-icon>
+            </v-btn>
+          
+        </div>
+      </div>    
+    </div>
+  </v-col>  
+  <v-col cols="4" align-self="end" class="d-none d-md-block">
+    <v-col align-self="end">
+      <v-text-field label="请输入关键字" data-src="search.xml" v-model="searchHeaderValue" prepend-icon="search" clearable clear-icon="clear" @keydown.enter="EnterSearch(searchHeaderValue,false)"></v-text-field>
+    </v-col> 
+  </v-col>
+</v-row>
+
+                            <v-card class="elevation-2 post-card">
+    
+    
+        <div class="post-header">
+  <a class="post-header-title font-weight-medium" href="/2020/05/20/cmu15-445-%E6%95%B0%E6%8D%AE%E5%BA%93%E5%AD%98%E5%82%A8part2/">CMU15-445学习笔记-数据库存储part2</a>
+  <div class="post-header-meta">   
+    <span>
+      <v-icon color="">event</v-icon>
+      Posted on:&nbsp;2020-05-20
+    </span>
+    <span>
+      <v-icon color="">event_available</v-icon>
+      Edited on:&nbsp;2020-08-30
+    </span>
+    <span>
+      <v-icon color="">folder</v-icon>
+      In:&nbsp;<a class="category-link" href="/categories/cmu15-445/">cmu15-445</a>
+    </span>
+    
+    <span>
+      <v-icon color="">visibility</v-icon>
+      Views:&nbsp;<span id="busuanzi_container_page_pv"><span id="busuanzi_value_page_pv"></span></span>
+    </span>
+    
+  </div>
+</div>
 
     
     
     
-    <div class="post-body" itemprop="articleBody">
-
-      
+    
+    <div class="post-content">
         <h2 id="面向磁盘型数据库系统"><a href="#面向磁盘型数据库系统" class="headerlink" title="面向磁盘型数据库系统"></a>面向磁盘型数据库系统</h2><h3 id="page布局"><a href="#page布局" class="headerlink" title="page布局"></a>page布局</h3><h4 id="log-structured"><a href="#log-structured" class="headerlink" title="log-structured"></a>log-structured</h4><p>上节课我们在讲到page布局时说到了<strong>tuple-oriented</strong>的方式，使用slotted page的方法将每一个tuple对应的偏移量保存在slot中，这样就能在定位到tuple在page内部的位置。这节课将会补充说明另外一种<strong>log-structured</strong>方法。</p>
 <p>这种组织方式不是将所有tuple存放在page内，而是去存储这些与创建tuple，修改tuple相关的日志信息。在page内部，我们不断的追加日志信息，并且这些信息是以文本形式存储的。当我们对tuple执行某项操作（insert xxx,update xxx等)，我们只需要将这个操作记录为一个日志条目并且追加到page的尾部就行。</p>
 <p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/A1RC090MJI4LMOEA@U.png"></p>
@@ -343,193 +311,71 @@
 <p>这两节课中，我们讨论了DBMS如何在磁盘上表示文件，下节课我们会讨论如何将数据放入内存，并对它们进行管理。</p>
 
     </div>
-
+    <!--文末结束语-->
     
+        <div style="text-align:center;color: #ccc;font-size:24px;"> --- 本文结束 <i class="fas fa-heart"></i> The End --- </div>
     
+    <!--页脚广告-->
     
-
-      <footer class="post-footer">
-
+    <v-divider></v-divider>
+    
+    <div class="post-nav">             
         
-
-
+            <v-btn text class="font-weight-bold" href="/2020/05/27/cmu15-445-%E7%BC%93%E5%86%B2%E6%B1%A0%E5%92%8C%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86/">
+                <v-icon>chevron_left</v-icon>
+                CMU15-445学习笔记-缓冲池和内存管理
+            </v-btn> 
         
-    <div class="post-nav">
-      <div class="post-nav-item">
-    <a href="/2020/05/14/cmu15-445-%E6%95%B0%E6%8D%AE%E5%BA%93%E5%AD%98%E5%82%A8part1/" rel="prev" title="CMU15-445学习笔记-数据库存储part1">
-      <i class="fa fa-chevron-left"></i> CMU15-445学习笔记-数据库存储part1
-    </a></div>
-      <div class="post-nav-item">
-    <a href="/2020/05/27/cmu15-445-%E7%BC%93%E5%86%B2%E6%B1%A0%E5%92%8C%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86/" rel="next" title="CMU15-445学习笔记-缓冲池和内存管理">
-      CMU15-445学习笔记-缓冲池和内存管理 <i class="fa fa-chevron-right"></i>
-    </a></div>
+          
+            <v-btn text class="float-right font-weight-bold" href="/2020/05/14/cmu15-445-%E6%95%B0%E6%8D%AE%E5%BA%93%E5%AD%98%E5%82%A8part1/">      
+                CMU15-445学习笔记-数据库存储part1
+                <v-icon>chevron_right</v-icon>
+            </v-btn>
+        
     </div>
-      </footer>
-    
-  </article>
-  
-  
-  
+</v-card>
 
 
 
-          </div>
-          
-
-<script>
-  window.addEventListener('tabs:register', () => {
-    let { activeClass } = CONFIG.comments;
-    if (CONFIG.comments.storage) {
-      activeClass = localStorage.getItem('comments_active') || activeClass;
-    }
-    if (activeClass) {
-      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
-      if (activeTab) {
-        activeTab.click();
-      }
-    }
-  });
-  if (CONFIG.comments.storage) {
-    window.addEventListener('tabs:click', event => {
-      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
-      let commentClass = event.target.classList[1];
-      localStorage.setItem('comments_active', commentClass);
-    });
-  }
-</script>
-
-        </div>
-          
-  
-  <div class="toggle sidebar-toggle">
-    <span class="toggle-line toggle-line-first"></span>
-    <span class="toggle-line toggle-line-middle"></span>
-    <span class="toggle-line toggle-line-last"></span>
-  </div>
-
-  <aside class="sidebar">
-    <div class="sidebar-inner">
-
-      <ul class="sidebar-nav motion-element">
-        <li class="sidebar-nav-toc">
-          文章目录
-        </li>
-        <li class="sidebar-nav-overview">
-          站点概览
-        </li>
-      </ul>
-
-      <!--noindex-->
-      <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%9D%A2%E5%90%91%E7%A3%81%E7%9B%98%E5%9E%8B%E6%95%B0%E6%8D%AE%E5%BA%93%E7%B3%BB%E7%BB%9F"><span class="nav-number">1.</span> <span class="nav-text">面向磁盘型数据库系统</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#page%E5%B8%83%E5%B1%80"><span class="nav-number">1.1.</span> <span class="nav-text">page布局</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#log-structured"><span class="nav-number">1.1.1.</span> <span class="nav-text">log-structured</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BD%BF%E7%94%A8tuple%E8%A1%A8%E7%A4%BA%E6%95%B0%E6%8D%AE"><span class="nav-number">1.2.</span> <span class="nav-text">使用tuple表示数据</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%B5%AE%E7%82%B9%E6%95%B0%EF%BC%88float-real%EF%BC%89%E5%92%8C%E5%AE%9A%E7%82%B9%E6%95%B0%EF%BC%88decimal-numeric%EF%BC%89%E5%AF%B9%E6%AF%94"><span class="nav-number">1.2.1.</span> <span class="nav-text">浮点数（float&#x2F;real）和定点数（decimal&#x2F;numeric）对比</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AD%98%E5%82%A8%E4%B8%80%E4%B8%AA%E8%BF%87%E5%A4%A7%E7%9A%84%E6%95%B0%E6%8D%AE"><span class="nav-number">1.3.</span> <span class="nav-text">存储一个过大的数据</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#overflow-page"><span class="nav-number">1.3.0.1.</span> <span class="nav-text">overflow page</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E5%A4%96%E9%83%A8%E5%AD%98%E5%82%A8"><span class="nav-number">1.3.0.2.</span> <span class="nav-text">外部存储</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#system-catalog"><span class="nav-number">1.4.</span> <span class="nav-text">system catalog</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AD%98%E5%82%A8%E6%A8%A1%E5%9E%8B"><span class="nav-number">1.5.</span> <span class="nav-text">存储模型</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#workload"><span class="nav-number">1.5.1.</span> <span class="nav-text">workload</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#OLTP%EF%BC%88On-line-Transaction-Processing%EF%BC%89"><span class="nav-number">1.5.1.1.</span> <span class="nav-text">OLTP（On-line Transaction Processing）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#OLAP%EF%BC%88On-line-Analytical-Processing"><span class="nav-number">1.5.1.2.</span> <span class="nav-text">OLAP（On-line Analytical Processing)</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#OLTP%E4%B8%8EOLAP%E7%9A%84%E5%AF%B9%E6%AF%94"><span class="nav-number">1.5.1.3.</span> <span class="nav-text">OLTP与OLAP的对比</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#n-ary%E5%AD%98%E5%82%A8%E6%A8%A1%E5%9E%8B%EF%BC%88%E8%A1%8C%E5%AD%98%E5%82%A8%E6%A8%A1%E5%9E%8B%EF%BC%89"><span class="nav-number">1.5.2.</span> <span class="nav-text">n-ary存储模型（行存储模型）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#column%E5%AD%98%E5%82%A8%E6%A8%A1%E5%9E%8B%EF%BC%88%E5%88%97%E5%AD%98%E5%82%A8%E6%A8%A1%E5%9E%8B%EF%BC%89"><span class="nav-number">1.5.3.</span> <span class="nav-text">column存储模型（列存储模型）</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%E5%8E%8B%E7%BC%A9%E6%95%B0%E6%8D%AE"><span class="nav-number">1.5.3.1.</span> <span class="nav-text">压缩数据</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E5%AE%9A%E4%BD%8Dtuple%E7%9A%84%E5%B1%9E%E6%80%A7"><span class="nav-number">1.5.3.2.</span> <span class="nav-text">定位tuple的属性</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">1.6.</span> <span class="nav-text">总结</span></a></li></ol></li></ol></div>
-      </div>
-      <!--/noindex-->
-
-      <div class="site-overview-wrap sidebar-panel">
-        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
-    <img class="site-author-image" itemprop="image" alt="wwow"
-      src="/uploads/avatar.png">
-  <p class="site-author-name" itemprop="name">wwow</p>
-  <div class="site-description" itemprop="description">努力不一定会成功，但不努力真的很舒服</div>
-</div>
-<div class="site-state-wrap motion-element">
-  <nav class="site-state">
-      <div class="site-state-item site-state-posts">
-          <a href="/archives/">
         
-          <span class="site-state-item-count">19</span>
-          <span class="site-state-item-name">日志</span>
-        </a>
-      </div>
-      <div class="site-state-item site-state-categories">
-            <a href="/categories/">
-          
-        <span class="site-state-item-count">5</span>
-        <span class="site-state-item-name">分类</span></a>
-      </div>
-  </nav>
-</div>
-
-
-
-      </div>
-
+                            <div id="mobile-footer" class="d-block d-md-none">
+                                <v-divider></v-divider>
+                                <div id="mobile-footer-content">
+                                    <span>Theme: <a target="_blank" rel="noopener" href="https://github.com/kb1000fx/hexo-theme-insulin">Insulin</a> &nbsp; Powered by <a target="_blank" rel="noopener" href="https://hexo.io/">Hexo</a></span><br>
+                                    <span> &copy; 2015 - 2020 wwow</span>
+                                </div>
+                            </div>                   
+                        </v-col>                                            
+                    </v-row>
+                </v-container>
+            </v-content>
+        </v-app>
     </div>
-  </aside>
-  <div id="sidebar-dimmer"></div>
+    
+<script src="https://cdn.jsdelivr.net/npm/vue@2.6.11"></script>
+<script src="https://cdn.jsdelivr.net/npm/vuetify@2.2.30"></script>
+
+<script src="/js/main.js"></script>
 
 
-      </div>
-    </main>
 
-    <footer class="footer">
-      <div class="footer-inner">
-        
 
-        
+    <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
 
-<div class="copyright">
-  
-  &copy; 
-  <span itemprop="copyrightYear">2020</span>
-  <span class="with-love">
-    <i class="fa fa-heart"></i>
-  </span>
-  <span class="author" itemprop="copyrightHolder">wwow</span>
-</div>
-  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
-  </div>
 
-        
+
+
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@8.4.8/dist/mermaid.min.js"></script>
+    <script>mermaid.initialize({
+        startOnLoad: true,
+        theme: "default"
+    });</script>
 
 
 
 
 
 
-
-
-      </div>
-    </footer>
-  </div>
-
-  
-  <script src="/lib/anime.min.js"></script>
-  <script src="/lib/velocity/velocity.min.js"></script>
-  <script src="/lib/velocity/velocity.ui.min.js"></script>
-
-<script src="/js/utils.js"></script>
-
-<script src="/js/motion.js"></script>
-
-
-<script src="/js/schemes/pisces.js"></script>
-
-
-<script src="/js/next-boot.js"></script>
-
-
-
-
-  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  
-
-  
 
 </body>
 </html>

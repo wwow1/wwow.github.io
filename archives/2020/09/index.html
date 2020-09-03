@@ -38,8 +38,8 @@
     
     
     <title>
-        
-            tags | wwow&#39;s blog
+          
+            wwow&#39;s blog
         
     </title>
     
@@ -219,19 +219,34 @@
   </v-col>
 </v-row>
 
-                            <v-card class="elevation-2 post-card">
-    <div class="post-header">
-        <a class="post-header-title font-weight-medium" href="/tags/index.html">Tags</a>
-    </div>
-    <div class="post-content">
+                            
+<v-card class="elevation-2 index-card">
+    <v-timeline class="timeline" dense>
         
-            <p>layout: tags</p>
-<p>comments: false</p>
-
+            
+            
+                <v-timeline-item class="timeline-header" color="secondary lighten-2">
+                    <a href="/archives/2020" class="timeline-title">2020</a>
+                    <span class="timeline-subtitle">Archives</span>
+                </v-timeline-item>
+                
+            
+            <v-timeline-item fill-dot small color="secondary lighten-2">
+                <div class="timeline-item-post d-none d-md-block">
+                    <span class="timeline-item-time">2020.09.03</span>
+                    <a href="/2020/09/03/csapp-dateLab/" class="timeline-item-title">csapp-dateLab</a>
+                </div>
+                <div class="timeline-item-post-mobile d-block d-md-none">
+                    <span class="timeline-item-time">2020.09.03</span><br>
+                    <a href="/2020/09/03/csapp-dateLab/" class="timeline-item-title">csapp-dateLab</a>
+                </div>
+                <v-divider></v-divider>
+            </v-timeline-item>
         
-    </div>
+    </v-timeline>
 </v-card>
-        
+
+         
                             <div id="mobile-footer" class="d-block d-md-none">
                                 <v-divider></v-divider>
                                 <div id="mobile-footer-content">
