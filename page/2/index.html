@@ -183,7 +183,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-08-30 12:44:55" itemprop="dateModified" datetime="2020-08-30T12:44:55+08:00">2020-08-30</time>
+                <time title="修改时间：2020-09-04 22:33:02" itemprop="dateModified" datetime="2020-09-04T22:33:02+08:00">2020-09-04</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -210,7 +210,7 @@
 <p>在lab4中，我们将要搭建一个基于分片的kv存储系统，这个系统的工作流程稍微有一点复杂，我看了好几遍说明才看懂- -，同时也参考了一些网上的说明。</p>
 <p>简而言之分片（shard）就是将我们要保存的数据分割成多份，然后将这些分片分发给下层的不同个raft集群，每一个raft集群负责多个分片的保存和响应对应的数据操作，同时为了管理这些不同的raft集群，在多个raft集群之上还需要增加一个用于管理分片和集群配置的raft集群，这个集群称为shardmaster</p>
 <p>大家也许会想问分片是按照什么方法进行分割的呢？我认为具体的方法是由使用者决定的，在lab4中，由于保存的key-value全都是string变量，同时分片数量确定为10个，所以分配规则为 int(key[0])%10</p>
-<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/04/image-17.png"></p>
+<p><img src="https://s1.ax1x.com/2020/09/04/wA8dIA.png" alt="wA8dIA.png"></p>
 <p>这是我在网上看到的一个非常简单易懂的图片说明，取自<a target="_blank" rel="noopener" href="https://www.jianshu.com/p/6e8d33c3c799">https://www.jianshu.com/p/6e8d33c3c799</a></p>
 <p>在lab4A中，我们只需要完成shardmaster部分，不涉及具体的分片数据管理</p>
 <p>我们主要需要在shardmaster中为上层服务器提供4种服务，分别是</p>
@@ -592,7 +592,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-08-30 12:48:00" itemprop="dateModified" datetime="2020-08-30T12:48:00+08:00">2020-08-30</time>
+                <time title="修改时间：2020-09-04 22:32:42" itemprop="dateModified" datetime="2020-09-04T22:32:42+08:00">2020-09-04</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -698,7 +698,7 @@
 <p>详细优化情况参照<a target="_blank" rel="noopener" href="https://thesquareplanet.com/blog/students-guide-to-raft/">https://thesquareplanet.com/blog/students-guide-to-raft/</a></p>
 <p>这是MIT6.824某个助教写的guide，里面记录了一些大多数学习者都会遇到的corner case及其解决方法，大家如果在哪里卡住了可以参照一下</p>
 <p>为了大家方便，我直接将其中有关2C的优化点给截图下来。</p>
-<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/05/EMDCBAQRLLWOL7AUJPGYT.png"></p>
+<p><img src="https://s1.ax1x.com/2020/09/04/wA8rxf.png" alt="wA8rxf.png"></p>
 <p>LAB 2C 有关AppendEntryRPC内部的优化点</p>
 <p>当我们在AppendEntryRPC中发现Leader传入的prevLog和follower冲突时，我们就会返回，并在leader中回退prevLogIndex，我们原先的做法就是一次回退一步；但是这样会比较慢，如果leader和follower的Log之间差异过大的话，我们需要发送多次AppendEntry来回退prevLogIndex。为了加速回退过程，我们在每次回退的时候，可以回退到上一个term提交的log处，具体的处理方式在上图中说的比较详细。</p>
 <p>总结</p>
@@ -753,7 +753,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-08-30 12:00:10" itemprop="dateModified" datetime="2020-08-30T12:00:10+08:00">2020-08-30</time>
+                <time title="修改时间：2020-09-04 22:33:22" itemprop="dateModified" datetime="2020-09-04T22:33:22+08:00">2020-09-04</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -784,7 +784,7 @@
 <p>用户编写的reduce函数得到一个输入的key值和一个与key值向对应的value值的集合。reduce函数将这些值合并起来，产生一个较小的value值的集合作为结果（每次reduce调用一般只产生0或1个输出value值)</p>
 <p>3.实现</p>
 <p>3-1执行流程</p>
-<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/01/OP68GECH8ZVT5PR.jpg"></p>
+<p><img src="https://s1.ax1x.com/2020/09/04/wA80PI.png" alt="wA80PI.png"></p>
 <p>1.MapReduce库会将输入数据划分为M份（每份一般为16~64MB，可设置参数调整）然后将会把程序复制到集群中的每一台机器中</p>
 <p>2.在所有机器中，会存在一个Master，而其他机器都被称为worker，Master会为worker分配任务。共有M个map任务以及R个reduce任务需要被分配。master将会为每个空闲的worker分配一个map任务或reduce任务。（worker在一个时刻只能执行一个任务，但每个worker一般需要顺序的执行多个任务）</p>
 <p>3.被分配map任务的worker（称之为 map worker）将会读取对应的输入文件块，它从输入文件块中提取出一个key-value pair集合，并且将这个集合传入用户定义的Map函数。由Map函数产生的中间key-value pair集合将会暂时缓存在内存中</p>

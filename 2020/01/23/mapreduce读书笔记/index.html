@@ -27,12 +27,12 @@
 <meta property="og:site_name" content="wwow&#39;s blog">
 <meta property="og:description" content="1.介绍 MapReduce是一个用于处理大数据集的编程框架，它能够使没有任何分布式开发经验的程序员也能够使用大型分布式系统来进行数据处理。对于大多数使用者而言，他们只需要根据自己的需要编写MapReduce中的map函数和reduce函数就能够很容易的实现大规模并行化计算，同时MapReduce模型也提供了一定程度的错误处理。 2.编程模型 MapReduce编程模型的原理是：利用一个输入key">
 <meta property="og:locale">
-<meta property="og:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/01/OP68GECH8ZVT5PR.jpg">
+<meta property="og:image" content="https://s1.ax1x.com/2020/09/04/wA80PI.png">
 <meta property="article:published_time" content="2020-01-23T11:19:57.000Z">
-<meta property="article:modified_time" content="2020-08-30T04:00:10.492Z">
+<meta property="article:modified_time" content="2020-09-04T14:33:22.746Z">
 <meta property="article:author" content="wwow">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="http://119.23.248.105/%22wp-content/uploads%22/2020/01/OP68GECH8ZVT5PR.jpg">
+<meta name="twitter:image" content="https://s1.ax1x.com/2020/09/04/wA80PI.png">
 
 <link rel="canonical" href="http://yoursite.com/2020/01/23/mapreduce%E8%AF%BB%E4%B9%A6%E7%AC%94%E8%AE%B0/">
 
@@ -187,7 +187,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-08-30 12:00:10" itemprop="dateModified" datetime="2020-08-30T12:00:10+08:00">2020-08-30</time>
+                <time title="修改时间：2020-09-04 22:33:22" itemprop="dateModified" datetime="2020-09-04T22:33:22+08:00">2020-09-04</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -218,7 +218,7 @@
 <p>用户编写的reduce函数得到一个输入的key值和一个与key值向对应的value值的集合。reduce函数将这些值合并起来，产生一个较小的value值的集合作为结果（每次reduce调用一般只产生0或1个输出value值)</p>
 <p>3.实现</p>
 <p>3-1执行流程</p>
-<p><img src="http://119.23.248.105/%22wp-content/uploads%22/2020/01/OP68GECH8ZVT5PR.jpg"></p>
+<p><img src="https://s1.ax1x.com/2020/09/04/wA80PI.png" alt="wA80PI.png"></p>
 <p>1.MapReduce库会将输入数据划分为M份（每份一般为16~64MB，可设置参数调整）然后将会把程序复制到集群中的每一台机器中</p>
 <p>2.在所有机器中，会存在一个Master，而其他机器都被称为worker，Master会为worker分配任务。共有M个map任务以及R个reduce任务需要被分配。master将会为每个空闲的worker分配一个map任务或reduce任务。（worker在一个时刻只能执行一个任务，但每个worker一般需要顺序的执行多个任务）</p>
 <p>3.被分配map任务的worker（称之为 map worker）将会读取对应的输入文件块，它从输入文件块中提取出一个key-value pair集合，并且将这个集合传入用户定义的Map函数。由Map函数产生的中间key-value pair集合将会暂时缓存在内存中</p>
