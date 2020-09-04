@@ -1,199 +1,213 @@
 <!DOCTYPE html>
 <html lang="zh-Hans">
 <head>
-    <meta charset="UTF-8">
-    <meta http-equiv="Cache-Control" content="no-siteapp">
-    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-    
-    <meta name="renderer" content="webkit"/>
-    <meta name="force-rendering" content="webkit"/>
-    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
-    <script>if (/*@cc_on!@*/false || (!!window.MSInputMethodContext && !!document.documentMode)) window.location.href="https://support.dmeng.net/upgrade-your-browser.html?referrer="+encodeURIComponent(window.location.href); </script>
-    
-    
-        <link rel="shortcut icon" href="/images/favicon.ico">
-    
-     
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/5.13.1/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/vuetify@2.2.30/dist/vuetify.min.css" rel="stylesheet">
-    
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.1.1">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
 <link rel="stylesheet" href="/css/main.css">
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-              
-    
-    
-    
-    
-    
-    <title>
-        
-            MIT-6.824-lab4B-Sharded Key/Value Server | wwow&#39;s blog
-        
-    </title>
-    
-    
-<meta name="generator" content="Hexo 5.1.1"></head>
-<body>
-    <div id="app">
-        <v-app>
-            <v-content id="page">
-                <v-container fluid>
-                    <v-row>
-                        <v-col cols="2" class="d-none d-md-block">
-                            <div id="sidebar" class="float-right">
-    <a href="/" rel="home">
-        <v-avatar size=96>
-            <img id="logo" src="/images/avatar.webp">     
-        </v-avatar> 
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"yoursite.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="github: https:&#x2F;&#x2F;github.com&#x2F;wwow1&#x2F;MIT-6.824 在4A中我们完成了shardmaster的构建，那么下一步我们就需要完善shardmaster下层的分片kv存储系统。 在这个实验中，我们将数据进行分片处理，并将它们下放到不同的shardkv集群中进行管理。对于分片的内容和处理都应该对上层进行封装，简而言之，对于上层的用户而言，他的使用体验应该和lab3相同。而">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MIT-6.824-lab4B-Sharded Key&#x2F;Value Server">
+<meta property="og:url" content="http://yoursite.com/2020/04/18/mit-6-824-lab4b-sharded-key-value-server/index.html">
+<meta property="og:site_name" content="wwow&#39;s blog">
+<meta property="og:description" content="github: https:&#x2F;&#x2F;github.com&#x2F;wwow1&#x2F;MIT-6.824 在4A中我们完成了shardmaster的构建，那么下一步我们就需要完善shardmaster下层的分片kv存储系统。 在这个实验中，我们将数据进行分片处理，并将它们下放到不同的shardkv集群中进行管理。对于分片的内容和处理都应该对上层进行封装，简而言之，对于上层的用户而言，他的使用体验应该和lab3相同。而">
+<meta property="og:locale">
+<meta property="article:published_time" content="2020-04-18T09:19:25.000Z">
+<meta property="article:modified_time" content="2020-08-30T04:47:35.601Z">
+<meta property="article:author" content="wwow">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://yoursite.com/2020/04/18/mit-6-824-lab4b-sharded-key-value-server/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-Hans'
+  };
+</script>
+
+  <title>MIT-6.824-lab4B-Sharded Key/Value Server | wwow's blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">wwow's blog</h1>
+      <span class="logo-line-after"><i></i></span>
     </a>
-    <v-divider></v-divider>
-    <div class="mini-menu">
-        <v-btn icon href="/">
-            <v-icon>home</v-icon>
-        </v-btn>
-        <v-btn icon href="/categories/">
-            <v-icon>folder</v-icon>
-        </v-btn>
-        <v-btn icon href="/tags/">
-            <v-icon>bookmark</v-icon>
-        </v-btn>
-        <v-btn icon @click="SetNightMode">
-            <v-icon>{{ nightMode }}</v-icon>
-        </v-btn>
-    </div>
-    <v-list id="main-menu" class="font-weight-bold" flat>
-        
-            
-            <v-list-item href="/archives/" link>
-            <v-list-item-icon><v-icon>archive</v-icon></v-list-item-icon>
-            <v-list-item-content>
-                Archives
-            </v-list-item-content>
-            </v-list-item>
-        
-    </v-list>
-    <v-divider></v-divider>
-    
-        <div class="post-toc">
-            <a href="/2020/04/18/mit-6-824-lab4b-sharded-key-value-server/" class="toc-header">Table of Contents</a>
-            <div class="toc-content">
-                
-            </div>
-        </div>
-    
+  </div>
 
-    <div id="footer">
-        <div class="footer-social">
-            
-                
-                <v-btn icon href="https://github.com/wwow1" target="_blank">
-                    <v-icon>fab fa-github</v-icon>
-                </v-btn>
-            
-        </div>
-        <v-divider></v-divider>
-        <div class="footer-content">
-            
-                <span id="busuanzi_container_site_uv" style="display: none;"> 
-                    Total Visitors <span id="busuanzi_value_site_uv"></span>
-                </span>
-                <br>
-            
-            <span>Theme: <a target="_blank" rel="noopener" href="https://github.com/kb1000fx/hexo-theme-insulin">Insulin</a></span><br>
-            <span>Powered by <a target="_blank" rel="noopener" href="https://hexo.io/">Hexo</a></span><br>
-            <span>
-                &copy; 2015 - 2020 
-                wwow
-            </span>
-        </div>
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
     </div>
-</div>
-
-                        </v-col>
-                        <v-col cols="12" md="10">
-                            <v-row>
-  <v-col cols="12" md="8" align-self="end">
-    <div id="site-header">
-      <div id="site-title">
-        <a href="/" rel="home">wwow&#39;s blog</a>
-      </div>
-      <div id="site-description">努力可能会成功，但不努力真的很舒服</div>
-      <div id="mobile-menu" class="d-block d-md-none">
-        <v-text-field label="请输入关键字" data-src="search.xml" v-model="searchHeaderValue" prepend-inner-icon="search" clearable clear-icon="clear" @keydown.enter="EnterSearch(searchHeaderValue,false)"></v-text-field>
-        <div class="mobile-mini-menu">
-          <v-btn icon href="/">
-              <v-icon>home</v-icon>
-          </v-btn>
-          <v-btn icon href="/categories/">
-              <v-icon>folder</v-icon>
-          </v-btn>
-          <v-btn icon href="/tags/">
-              <v-icon>bookmark</v-icon>
-          </v-btn>
-          <v-btn icon @click="SetNightMode">
-              <v-icon>{{ nightMode }}</v-icon>
-          </v-btn>
-          
-            
-            <v-btn icon href="/archives/">
-              <v-icon>archive</v-icon>
-            </v-btn>
-          
-        </div>
-      </div>    
-    </div>
-  </v-col>  
-  <v-col cols="4" align-self="end" class="d-none d-md-block">
-    <v-col align-self="end">
-      <v-text-field label="请输入关键字" data-src="search.xml" v-model="searchHeaderValue" prepend-icon="search" clearable clear-icon="clear" @keydown.enter="EnterSearch(searchHeaderValue,false)"></v-text-field>
-    </v-col> 
-  </v-col>
-</v-row>
-
-                            <v-card class="elevation-2 post-card">
-    
-    
-        <div class="post-header">
-  <a class="post-header-title font-weight-medium" href="/2020/04/18/mit-6-824-lab4b-sharded-key-value-server/">MIT-6.824-lab4B-Sharded Key/Value Server</a>
-  <div class="post-header-meta">   
-    <span>
-      <v-icon color="">event</v-icon>
-      Posted on:&nbsp;2020-04-18
-    </span>
-    <span>
-      <v-icon color="">event_available</v-icon>
-      Edited on:&nbsp;2020-08-30
-    </span>
-    <span>
-      <v-icon color="">folder</v-icon>
-      In:&nbsp;<a class="category-link" href="/categories/mit6-824/">mit6.824</a>
-    </span>
-    
-    <span>
-      <v-icon color="">visibility</v-icon>
-      Views:&nbsp;<span id="busuanzi_container_page_pv"><span id="busuanzi_value_page_pv"></span></span>
-    </span>
-    
   </div>
 </div>
 
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/04/18/mit-6-824-lab4b-sharded-key-value-server/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/uploads/avatar.png">
+      <meta itemprop="name" content="wwow">
+      <meta itemprop="description" content="努力可能会成功，但不努力真的很舒服">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="wwow's blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          MIT-6.824-lab4B-Sharded Key/Value Server
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-04-18 17:19:25" itemprop="dateCreated datePublished" datetime="2020-04-18T17:19:25+08:00">2020-04-18</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-08-30 12:47:35" itemprop="dateModified" datetime="2020-08-30T12:47:35+08:00">2020-08-30</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/mit6-824/" itemprop="url" rel="index"><span itemprop="name">mit6.824</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
     
     
     
-    
-    <div class="post-content">
+    <div class="post-body" itemprop="articleBody">
+
+      
         <p><a target="_blank" rel="noopener" href="https://github.com/wwow1/MIT-6.824">github: https://github.com/wwow1/MIT-6.824</a></p>
 <p>在4A中我们完成了shardmaster的构建，那么下一步我们就需要完善shardmaster下层的分片kv存储系统。</p>
 <p>在这个实验中，我们将数据进行分片处理，并将它们下放到不同的shardkv集群中进行管理。对于分片的内容和处理都应该对上层进行封装，简而言之，对于上层的用户而言，他的使用体验应该和lab3相同。而shardkv服务器向上层提供Get，Put，Append三个接口（它们的功能和lab3相同）</p>
@@ -305,71 +319,192 @@
 <p>到此为止MIT6.824的lab就完成了，虽然在细节上有很多的不足，但是我认为以我目前的水平能够基本完成测试点覆盖的大多数情况就足够了，进一步的代码优化任务就取决于以后的我了。</p>
 
     </div>
-    <!--文末结束语-->
+
     
-        <div style="text-align:center;color: #ccc;font-size:24px;"> --- 本文结束 <i class="fas fa-heart"></i> The End --- </div>
     
-    <!--页脚广告-->
     
-    <v-divider></v-divider>
-    
-    <div class="post-nav">             
+
+      <footer class="post-footer">
+
         
-            <v-btn text class="font-weight-bold" href="/2020/05/14/cmu15-445-%E6%95%B0%E6%8D%AE%E5%BA%93%E5%AD%98%E5%82%A8part1/">
-                <v-icon>chevron_left</v-icon>
-                CMU15-445学习笔记-数据库存储part1
-            </v-btn> 
+
+
         
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/04/10/mit-6-824-4a-shardmaster/" rel="prev" title="MIT-6.824-lab4A-The Shard Master">
+      <i class="fa fa-chevron-left"></i> MIT-6.824-lab4A-The Shard Master
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/05/14/cmu15-445-%E6%95%B0%E6%8D%AE%E5%BA%93%E5%AD%98%E5%82%A8part1/" rel="next" title="CMU15-445学习笔记-数据库存储part1">
+      CMU15-445学习笔记-数据库存储part1 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
           
-            <v-btn text class="float-right font-weight-bold" href="/2020/04/10/mit-6-824-4a-shardmaster/">      
-                MIT-6.824-lab4A-The Shard Master
-                <v-icon>chevron_right</v-icon>
-            </v-btn>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="wwow"
+      src="/uploads/avatar.png">
+  <p class="site-author-name" itemprop="name">wwow</p>
+  <div class="site-description" itemprop="description">努力可能会成功，但不努力真的很舒服</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
         
+          <span class="site-state-item-count">21</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
     </div>
-</v-card>
+  </aside>
+  <div id="sidebar-dimmer"></div>
 
 
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
 
         
-                            <div id="mobile-footer" class="d-block d-md-none">
-                                <v-divider></v-divider>
-                                <div id="mobile-footer-content">
-                                    <span>Theme: <a target="_blank" rel="noopener" href="https://github.com/kb1000fx/hexo-theme-insulin">Insulin</a> &nbsp; Powered by <a target="_blank" rel="noopener" href="https://hexo.io/">Hexo</a></span><br>
-                                    <span> &copy; 2015 - 2020 wwow</span>
-                                </div>
-                            </div>                   
-                        </v-col>                                            
-                    </v-row>
-                </v-container>
-            </v-content>
-        </v-app>
-    </div>
-    
-<script src="https://cdn.jsdelivr.net/npm/vue@2.6.11"></script>
-<script src="https://cdn.jsdelivr.net/npm/vuetify@2.2.30"></script>
 
-<script src="/js/main.js"></script>
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">wwow</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
 
-
-
-
-    <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
-
-
-
-
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@8.4.8/dist/mermaid.min.js"></script>
-    <script>mermaid.initialize({
-        startOnLoad: true,
-        theme: "default"
-    });</script>
+        
 
 
 
 
 
 
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
 
 </body>
 </html>
