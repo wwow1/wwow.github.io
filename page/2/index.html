@@ -152,6 +152,188 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/04/18/mit-6-824-lab4b-sharded-key-value-server/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/uploads/avatar.png">
+      <meta itemprop="name" content="wwow">
+      <meta itemprop="description" content="努力可能会成功，但不努力真的很舒服">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="wwow's blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/04/18/mit-6-824-lab4b-sharded-key-value-server/" class="post-title-link" itemprop="url">MIT-6.824-lab4B-Sharded Key/Value Server</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-04-18 17:19:25" itemprop="dateCreated datePublished" datetime="2020-04-18T17:19:25+08:00">2020-04-18</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-08-30 12:47:35" itemprop="dateModified" datetime="2020-08-30T12:47:35+08:00">2020-08-30</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/mit6-824/" itemprop="url" rel="index"><span itemprop="name">mit6.824</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p><a target="_blank" rel="noopener" href="https://github.com/wwow1/MIT-6.824">github: https://github.com/wwow1/MIT-6.824</a></p>
+<p>在4A中我们完成了shardmaster的构建，那么下一步我们就需要完善shardmaster下层的分片kv存储系统。</p>
+<p>在这个实验中，我们将数据进行分片处理，并将它们下放到不同的shardkv集群中进行管理。对于分片的内容和处理都应该对上层进行封装，简而言之，对于上层的用户而言，他的使用体验应该和lab3相同。而shardkv服务器向上层提供Get，Put，Append三个接口（它们的功能和lab3相同）</p>
+<p>首先说明一下，我贴出的代码都是最终代码，所以在解释过程中大家可能发现某些代码的作用不太看得懂，那么可以先略过它们，等到后面看到错误解析的时候就会明白它们的作用</p>
+<p><strong>1.移植lab3代码</strong></p>
+<p>任务书上说，我们首先应该通过第一个测试，这个测试是静态的分片，我们不用考虑集群变化和分片迁移的问题，先把lab3中的代码抄过来（记得在common中的RPC结构中也要加上opnum和clientId）  </p>
+<p>在将lab3的代码转移过来的时候有一些需要修改的地方，我们看一看实验提供的client代码，可以看到对于每一次的Get，PutAppend的返回中，都需要根据reply.Err来决定下一步的操作，而在lab3中我没有使用到这个变量，所以我需要在server代码的RPC调用添加上对于Err的修改</p>
+<p>（1）确定WrongLeader=true时，不需要管Err</p>
+<p>（2）WrongLeader=false， 且该请求已经被成功执行，则Err=OK</p>
+<p>（3）WrongLeader=false，但该请求的key不属于当前集群所负责的分片，Err=ErrWrongGroup</p>
+<p>既然提到了对key的判断，那么也应该在server的Get和PutAppend中判断改key是否处于当前集群的管理中</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(kv *ShardKV)</span> <span class="title">checkShard</span><span class="params">(key <span class="keyword">string</span>)</span> <span class="title">bool</span></span>&#123;</span><br><span class="line">	kv.mu.Lock()</span><br><span class="line">	<span class="keyword">defer</span> kv.mu.Unlock()</span><br><span class="line">	<span class="keyword">return</span> kv.configuration.Shards[key2shard(key)]!=kv.gid</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//server.go中Get和PutAppend的最前端</span></span><br><span class="line">_,isLeader:=kv.rf.GetState()</span><br><span class="line"><span class="keyword">if</span> isLeader==<span class="literal">false</span>&#123;</span><br><span class="line">	reply.WrongLeader=<span class="literal">true</span></span><br><span class="line">	<span class="keyword">return</span></span><br><span class="line">&#125;</span><br><span class="line">reply.WrongLeader=<span class="literal">false</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> kv.checkShard(args.Key)&#123;  <span class="comment">//判断key是否属于当前集群</span></span><br><span class="line">	reply.Err=ErrWrongGroup</span><br><span class="line">	<span class="keyword">return</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>2.更新Config信息</strong></p>
+<p>现在我们的kv系统已经能够在静态分片的情况下工作了，那么下一步就需要解决集群更改的问题了</p>
+<p>首先我们需要单独开启一个线程让它能够周期性的向shardmaster询问当前最新的集群信息（config），如果shardmaster发布了更新的集群信息，那么就需要更改自己的集群信息，然后更改集群配置</p>
+<p>由于我的查询函数比较复杂，涉及到后面的一些细节，不便于在这一段讲解，所以我用文字给大家列一下执行步骤。</p>
+<p>查询函数QueryConfig执行流程：</p>
+<p>（1）<strong>周期性</strong>地循环调用shardmaster的接口Query，来获得最新的下一个的Config（Query(kv.configuration.Num+1))</p>
+<p>（2.1）如果shardmaster返回的newConfig.Num&gt;kv.Config,Num，就使用newConfig来替换当前config。并且如果当前函数执行者是集群的<strong>leader</strong>，那么它就应该对比newConfig和当前config得到需要更新的分片编号，然后调用sendShardMigrationRPC；如果不是leader就等待进入下一次循环</p>
+<p>（2.2）如果newConfig.Num&lt;=kv.Config.Num，那么就等待进入下一次循环</p>
+<p><strong>3.分片迁移</strong></p>
+<p>然后我们再说一下sendShardMigrationRPC，我们知道当集群配置发生变化时，不同集群所负责的分片也会发生变化，某些分片可能从当前的集群迁移到另一个集群，sendShardMigrationRPC的作用就是负责分片的迁移，这里需要考虑一下到底是主动发送RPC去请求分片，还是等待对方将分片送过来。</p>
+<p>实验指导书上面有提到，在shardkv server可以继续存储不属于它负责的分片，这将简化我们的工作。这也意味着，对于一个shardkv server而言，它不需要管那些即将离去的分片，因为它们根本就不影响自己的工作；但对于要接受这些分片的server而言，何时接收到这些新的分片将影响它们对于client request的响应，所以我选择由分片接收方主动请求分片</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//傻瓜版的syncMap，主要用于整合sendShardMigrationRPC中得来的新分片</span></span><br><span class="line"><span class="keyword">type</span> syncMap <span class="keyword">struct</span>&#123;</span><br><span class="line">	State <span class="keyword">map</span>[<span class="keyword">string</span>]<span class="keyword">string</span> <span class="comment">//key-&gt;value</span></span><br><span class="line">	ApplyNum <span class="keyword">map</span>[<span class="keyword">int64</span>]<span class="keyword">int</span>  <span class="comment">//clientId-&gt;opnum</span></span><br><span class="line">	mu 	sync.Mutex</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//sendShardMigrationRPC的主要代码</span></span><br><span class="line"><span class="comment">//为了保证一致性，要求分片的转移只能在leader间进行，然后leader再通过raft实现//集群内部的一致性</span></span><br><span class="line"><span class="keyword">for</span> _,v:=<span class="keyword">range</span> newShards&#123;</span><br><span class="line">	wg.Add(<span class="number">1</span>)</span><br><span class="line">	<span class="keyword">go</span> <span class="function"><span class="keyword">func</span><span class="params">(value <span class="keyword">int</span>)</span></span>&#123;</span><br><span class="line">		<span class="keyword">defer</span> wg.Done()</span><br><span class="line">		<span class="keyword">for</span>&#123;</span><br><span class="line">			<span class="keyword">if</span> oldConfig.Shards[value]==<span class="number">0</span>&#123;  </span><br><span class="line">				<span class="keyword">return</span></span><br><span class="line">			&#125;</span><br><span class="line">			<span class="keyword">if</span> servers, ok := oldConfig.Groups[oldConfig.Shards[value]]; ok &#123;</span><br><span class="line">				<span class="keyword">for</span> si := <span class="number">0</span>; si &lt; <span class="built_in">len</span>(servers); si++ &#123;</span><br><span class="line">					srv := kv.make_end(servers[si])</span><br><span class="line">					args:=ShardMigrationArgs&#123;value,nowConfig.Num,oldConfig.Num&#125;</span><br><span class="line">					<span class="keyword">var</span> reply ShardMigrationReply</span><br><span class="line">					ok := srv.Call(<span class="string">&quot;ShardKV.ShardMigration&quot;</span>, &amp;args, &amp;reply)</span><br><span class="line">					WrongLeader:=reply.WrongLeader</span><br><span class="line">					<span class="keyword">if</span> ok &amp;&amp; WrongLeader==<span class="literal">false</span>&#123;</span><br><span class="line">						tmp.mu.Lock()</span><br><span class="line">						<span class="keyword">for</span> k,s:=<span class="keyword">range</span> reply.State&#123;</span><br><span class="line">							tmp.State[k]=s</span><br><span class="line">						&#125;</span><br><span class="line">						<span class="keyword">for</span> k,s:=<span class="keyword">range</span> reply.ApplyNum&#123;</span><br><span class="line">							tmp.ApplyNum[k]=max(s,tmp.ApplyNum[k])</span><br><span class="line">						&#125;</span><br><span class="line">						tmp.mu.Unlock()</span><br><span class="line">						<span class="keyword">return</span></span><br><span class="line">					&#125;</span><br><span class="line">				&#125;</span><br><span class="line">			&#125;</span><br><span class="line">			time.Sleep(<span class="number">100</span> * time.Millisecond)</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;(v)</span><br><span class="line">&#125;</span><br><span class="line">wg.Wait()</span><br><span class="line">kv.Migrate(nowConfig,tmp.State,tmp.ApplyNum)</span><br><span class="line"><span class="comment">//将新的config和新的分片传入raft实现集群内一致</span></span><br></pre></td></tr></table></figure>
+
+<p>在这之后我们需要完善RPC handler-&gt;ShardMigration</p>
+<p>首先我们必须要保证，分片是在两个leader之间迁移，这样才能保证一致性（后续会举例说明）。然后还需要保证对方的config.Num与自己相同或大于自己，如果对方的config小于自己的话，那么许多请求还没有被apply，这时它的分片数据还不够“新”，许多append和put请求也许处于已被提交到raft但还未被apply阶段，如果直接把现在的数据取过来之后，那些请求再被apply到原集群上，这就导致我们取到的数据是缺失的，所以需要通过config.Num来实现一个简单的数据同步</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//ShardMigration 参数结构</span></span><br><span class="line"><span class="keyword">type</span> ShardMigrationArgs <span class="keyword">struct</span>&#123;</span><br><span class="line">	Shards <span class="keyword">int</span></span><br><span class="line">	ConfigNum <span class="keyword">int</span></span><br><span class="line">	LastConfigNum <span class="keyword">int</span>  </span><br><span class="line"><span class="comment">//与下文提到的afterUpdateConfig相同，同样是为保证数据同步</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">type</span> ShardMigrationReply <span class="keyword">struct</span>&#123;</span><br><span class="line">	WrongLeader <span class="keyword">bool</span></span><br><span class="line">	State	<span class="keyword">map</span>[<span class="keyword">string</span>]<span class="keyword">string</span>  <span class="comment">//key-&gt;value</span></span><br><span class="line">	ApplyNum  <span class="keyword">map</span>[<span class="keyword">int64</span>]<span class="keyword">int</span>   <span class="comment">//clientId-&gt;opnum</span></span><br><span class="line"><span class="comment">//实验书上有相关提示，用于防止request dup造成数据的错误</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(kv *ShardKV)</span> <span class="title">ShardMigration</span><span class="params">(args * ShardMigrationArgs, reply *ShardMigrationReply)</span></span>&#123;</span><br><span class="line">	_,isLeader:=kv.rf.GetState()</span><br><span class="line">	<span class="keyword">if</span> isLeader==<span class="literal">false</span>&#123;</span><br><span class="line">		reply.WrongLeader=<span class="literal">true</span></span><br><span class="line">		<span class="keyword">return</span></span><br><span class="line">	&#125;</span><br><span class="line">	t0:=time.Now()</span><br><span class="line"></span><br><span class="line"><span class="comment">//等待信息同步</span></span><br><span class="line">	<span class="keyword">for</span> (kv.configuration.Num&lt;args.ConfigNum || kv.afterUpdateConfig&lt;args.LastConfigNum) &amp;&amp; time.Since(t0).Seconds()&lt;<span class="number">1</span>&#123;</span><br><span class="line">		time.Sleep(<span class="number">100</span>*time.Millisecond)</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">if</span> kv.configuration.Num&lt;args.ConfigNum || kv.afterUpdateConfig&lt;args.LastConfigNum&#123;</span><br><span class="line">		reply.WrongLeader=<span class="literal">true</span></span><br><span class="line">		<span class="keyword">return</span></span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//传递状态信息和applyNum</span></span><br><span class="line">	kv.mu.Lock()</span><br><span class="line">	reply.State=<span class="built_in">make</span>(<span class="keyword">map</span>[<span class="keyword">string</span>]<span class="keyword">string</span>)</span><br><span class="line">	reply.ApplyNum=<span class="built_in">make</span>(<span class="keyword">map</span>[<span class="keyword">int64</span>]<span class="keyword">int</span>)</span><br><span class="line">	<span class="keyword">for</span> k,v:=<span class="keyword">range</span> kv.DB&#123;</span><br><span class="line">		<span class="keyword">if</span> key2shard(k)==args.Shards&#123;</span><br><span class="line">			reply.State[k]=v</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line"><span class="comment">//下面这部分可以先略过，在错误解析中会提及</span></span><br><span class="line">	<span class="keyword">for</span> index,v:=<span class="keyword">range</span> kv.applyNum&#123;   </span><br><span class="line">		shd,ok:=kv.ErrGroupApply[index]</span><br><span class="line">		<span class="keyword">if</span> ok &amp;&amp; args.Shards!=(<span class="keyword">int</span>(shd[<span class="number">0</span>])%shardmaster.NShards&#123;</span><br><span class="line">			reply.ApplyNum[index]=v<span class="number">-1</span></span><br><span class="line">		&#125;<span class="keyword">else</span>&#123;</span><br><span class="line">			reply.ApplyNum[index]=v</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line">	kv.mu.Unlock()</span><br><span class="line">	reply.WrongLeader=<span class="literal">false</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>4.提交newConfig</strong></p>
+<p>然后就是将新的集群信息传入raft实现集群内部一致性</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(kv *ShardKV)</span> <span class="title">Migrate</span><span class="params">(configuration shardmaster.Config,State <span class="keyword">map</span>[<span class="keyword">string</span>]<span class="keyword">string</span>,ApplyNum <span class="keyword">map</span>[<span class="keyword">int64</span>]<span class="keyword">int</span>)</span></span> &#123;</span><br><span class="line">	_,isLeader:=kv.rf.GetState()</span><br><span class="line">	<span class="keyword">if</span> isLeader==<span class="literal">false</span>&#123;</span><br><span class="line">		<span class="keyword">return</span></span><br><span class="line">	&#125;</span><br><span class="line">	op:=Op&#123;<span class="string">&quot;updateConfig&quot;</span>,<span class="number">0</span>,UpdateConfig&#123;configuration,State,ApplyNum&#125;,<span class="number">0</span>&#125;</span><br><span class="line">	_,_,Leader:=kv.rf.Start(op)</span><br><span class="line">	<span class="keyword">return</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>Migrate这一部分的内容很简单，主题就是调用rf.Start，但是不知道大家会不会有一个疑问，在lab3中，我们在start后，不应该还需要等待结果来确认这个command是否真的被apply吗？</p>
+<p>原因就是即使我们等待后明白了这个config是否被正确apply了，也没有意义。假设知道了config成功apply，那么就直接返回，不需要保存信息。而假设config没有成功apply，那么原因大概率是因为leader改变了，“我”已经不是leader了，那么“我”也无法再主导一次新的rf.start，所以结果还是直接返回。既然如此，干脆就不等待apply的结果了，在调用了rf.start之后就return</p>
+<p>config update这个请求是由server集群自己产生的请求，而不是由client调用的请求，所以config提交失败之后不能返回client，也不能让client再次寻找新的leader提交请求。</p>
+<p>但是如果我们不检验config update的结果的话，我们无法知道这个config是否成功的更新了，也许我们仅仅是再QueryConfig函数中更新了kv.configuration这一个变量，但是实际上的applyNum和DB都没有更新，那么就出大问题了</p>
+<p>为了解决这个问题，我使用了一个新的变量afterUpdateConfig ，用它来记录已更新的config.Num。</p>
+<p>然后我们需要进一步修改QueryConfig函数，这一次我们根据代码来实际分析一下整个函数流程</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//QueryConfig的主体</span></span><br><span class="line"></span><br><span class="line">_,isLeader:=kv.rf.GetState()</span><br><span class="line">afterUpdateConfig:=kv.afterUpdateConfig</span><br><span class="line">oldConfig = kv.mck.Query(afterUpdateConfig)</span><br><span class="line"><span class="comment">//当前config</span></span><br><span class="line"></span><br><span class="line">newConfig := kv.mck.Query(afterUpdateConfig+<span class="number">1</span>)</span><br><span class="line"><span class="comment">//下一个confiig</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> newConfig.Num &gt; kv.configuration.Num&#123;</span><br><span class="line">	kv.mu.Lock()</span><br><span class="line">	kv.configuration=newConfig</span><br><span class="line">	kv.mu.Unlock()</span><br><span class="line">	<span class="keyword">if</span> isLeader&#123; <span class="comment">//如果是leader，就需要确认新的分片</span></span><br><span class="line">		newShards:=<span class="built_in">make</span>([]<span class="keyword">int</span>,<span class="number">0</span>)</span><br><span class="line">		<span class="keyword">for</span> i := <span class="number">0</span>; i &lt; shardmaster.NShards; i++ &#123;</span><br><span class="line">			<span class="keyword">if</span> newConfig.Shards[i] == kv.gid &amp;&amp; oldConfig.Shards[i] != newConfig.Shards[i] &#123;</span><br><span class="line">				newShards = <span class="built_in">append</span>(newShards, i)</span><br><span class="line">			&#125;</span><br><span class="line">		&#125;</span><br><span class="line">		t0=time.Now()</span><br><span class="line">		<span class="keyword">go</span> kv.sendShardMigrationRPC(oldConfig,newShards)</span><br><span class="line"></span><br><span class="line">	&#125;</span><br><span class="line">&#125;<span class="keyword">else</span> <span class="keyword">if</span> newConfig.Num &lt;= kv.configuration.Num &amp;&amp; oldConfig.Num&lt;newConfig.Num &amp;&amp; time.Since(t0).Seconds()&gt;<span class="number">1</span> &amp;&amp; isLeader&#123;</span><br><span class="line"><span class="comment">//如果oldConfig.Num&lt;newConfig.Num说明这个新的config并没有真正的被apply</span></span><br><span class="line"><span class="comment">//设置一个时间点，例如这里的1s，如果超出时限仍没有被apply</span></span><br><span class="line"><span class="comment">//那么它有可能提交失败了，所以我们再次调用send...RPC重新获取分片并提交config</span></span><br><span class="line"></span><br><span class="line">	t0=time.Now()</span><br><span class="line">	<span class="keyword">var</span> newShards []<span class="keyword">int</span></span><br><span class="line">	<span class="keyword">for</span> i := <span class="number">0</span>; i &lt; shardmaster.NShards; i++ &#123;</span><br><span class="line">		<span class="keyword">if</span> newConfig.Shards[i] == kv.gid &amp;&amp; oldConfig.Shards[i] != newConfig.Shards[i] &#123;</span><br><span class="line">			newShards = <span class="built_in">append</span>(newShards, i)</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">go</span> kv.sendShardMigrationRPC(oldConfig,newShards)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>5.apply newConfig</strong></p>
+<p>在任务书中有提到，在我们进行一次集群变换的时候，是不应该接收新的client请求的，因为集群可能还没有实现真正意义上的更新（更新DB和applyNum），这时我们就需要在Get和PutAppend中添加等待</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> kv.afterUpdateConfig&lt;kv.configuration.Num&#123;</span><br><span class="line"><span class="comment">//条件满足说明新的config还没有被真正apply，则client的请求先搁置</span></span><br><span class="line">	time.Sleep(<span class="number">20</span>*time.Millisecond)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>当我们提交的updateConfig请求通过raft达到一致并被再次传递到shardkv中时，我们就需要使用updateConfig中的数据更新shardkv的状态信息和applyNum</p>
+<p>首先我们需要在apply函数中增加一个对updateConfig的处理接口</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> op.Operation==<span class="string">&quot;updateConfig&quot;</span>&#123;</span><br><span class="line">	Command:=(op.Command).(UpdateConfig)</span><br><span class="line">	kv.ApplyNewConfig(Command)</span><br><span class="line">	kv.mu.Lock()</span><br><span class="line">	<span class="keyword">if</span> msg.Index&gt;kv.commitIndex&#123;</span><br><span class="line">		kv.commitIndex=msg.Index</span><br><span class="line">		kv.commitTerm=msg.Term</span><br><span class="line">	&#125;</span><br><span class="line">	kv.mu.Unlock()</span><br><span class="line">	<span class="keyword">continue</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>然后转入ApplyNewConfig函数</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(kv *ShardKV)</span> <span class="title">ApplyNewConfig</span><span class="params">(args UpdateConfig)</span></span>&#123;</span><br><span class="line"><span class="comment">//首先要保证我们的集群是一定不会回退的，通过集群号来鉴别过时的config</span></span><br><span class="line">	<span class="keyword">if</span> kv.afterUpdateConfig!=args.Configuration.Num<span class="number">-1</span>&#123;</span><br><span class="line">		<span class="keyword">return</span></span><br><span class="line">	&#125;</span><br><span class="line">	kv.mu.Lock()</span><br><span class="line"></span><br><span class="line"><span class="comment">//有关ErrGroupApply的部分在错误解析部分会说明</span></span><br><span class="line">	<span class="keyword">for</span> k,v:=<span class="keyword">range</span> kv.ErrGroupApply&#123;</span><br><span class="line">		<span class="keyword">if</span> args.ApplyNum[k]&lt;kv.applyNum[k]&#123;</span><br><span class="line">			<span class="built_in">delete</span>(args.ApplyNum,k)</span><br><span class="line">			<span class="built_in">delete</span>(args.State,v)</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">for</span> k,v:=<span class="keyword">range</span> args.ApplyNum&#123;</span><br><span class="line">		kv.applyNum[k]=max(v,kv.applyNum[k])</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">for</span> k,v:=<span class="keyword">range</span> args.State&#123;</span><br><span class="line">		kv.DB[k]=v</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">//更新afterUpdateConfig</span></span><br><span class="line">	kv.afterUpdateConfig=max(args.Configuration.Num,kv.afterUpdateConfig)</span><br><span class="line"></span><br><span class="line">        <span class="comment">//做一个“啰嗦”的保护</span></span><br><span class="line">	<span class="keyword">if</span> kv.configuration.Num&lt;args.Configuration.Num&#123;</span><br><span class="line">		kv.configuration=args.Configuration  </span><br><span class="line">	&#125;</span><br><span class="line">	kv.mu.Unlock()</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>到此为止，我们的主要流程已经结束，但是debug之路才刚刚开始，我们需要根据错误反馈来进一步完善代码</p>
+<p><strong>6.错误解析和解决办法</strong></p>
+<p><strong>问题1：分片迁移中的数据缺失1</strong></p>
+<p>首先，我一开始在QueryConfig中使用Query（-1）来定义newConfig，这样每次得到的newConfig都是最新的，而不一定是下一个config。  </p>
+<p>但是这就导致了一种情况出现，如果shardmaster一次更新了两个config，假设当前config信息为config0{shard[100,100,100]}（假设只有三个分片，shard数组内的数组表示负责该分片的集群编号），更新的第一个config信息为config1{shard[101,101,101]}，更新的第二个分片是config2{ shard[102,102,102]}</p>
+<p>由于我们的QueryConfig是周期性的Query，所以在这种情况下，不同集群的config变化情况可能不同</p>
+<p>对于gid101而言，它直接从config0更新到了config2，但是不管是在config0还是config2中，gid101都不负责任何分片，它也不参与任何分片迁移过程。但是对于gid102而言，它先更新到config1，再更新到config2，从config1更新到config2的过程中，它不参与分片迁移过程，但是从config1更新到config2时，它需要向gid101请求三个分片。但是我们知道，gid101根本就没有任何分片，那么gid102取到的分片全是空的，但实际上在config0时，gid100中的这三个分片的内容不是空的，这就导致我们的分片数据缺失了</p>
+<p>造成这个错误的原因是由于不同集群的config变化情况不一致，所以我们修改了QueryConfig，使其每次只更新下一个config而不是最新的config。这样所有集群都会老老实实的从config0更新到config2，而不会发生有集群“跳步操作“造成它与其他集群的不一致</p>
+<p><strong>问题2：分片迁移中的数据缺失2</strong></p>
+<p>在ShardMigration中，一开始我没有使用到afterUpdateConfig，但是这导致了切片传递中的数据缺失</p>
+<p>同样是问题1中的例子，假设gid102从config1更新到config2，而gid101正从config0更新到config1。这时gid102应该向gid101请求分片，但是gid101可能也正在向gid100请求分片，那么可能在gid101还未向gid100取完分片前，gid102就取完分片了，这种情况下，gid102只取到了部分分片。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//ShardMigration的前置判断</span></span><br><span class="line"><span class="comment">//kv.afterUpdateConfig&gt;=args.LastConfigNum才向下执行</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">for</span> (kv.configuration.Num&lt;args.ConfigNum || kv.afterUpdateConfig&lt;args.LastConfigNum) &amp;&amp; time.Since(t0).Seconds()&lt;<span class="number">1</span>&#123;</span><br><span class="line">	time.Sleep(<span class="number">100</span>*time.Millisecond)</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">if</span> kv.configuration.Num&lt;args.ConfigNum || kv.afterUpdateConfig&lt;args.LastConfigNum&#123;</span><br><span class="line">	reply.WrongLeader=<span class="literal">true</span></span><br><span class="line">	<span class="keyword">return</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>为了解决这种问题，我们需要在取分片之前（ShardMigration）加上一个确认条件，即kv.afterUpdateConfig应该大于等于 args.LastConfigNum（就是afterUpdateConfig)</p>
+<p><strong>问题3：部分请求丢失</strong></p>
+<p>假设一种情况，数据A即将从gid100转移到gid101，一般来说，在转移过程中，server不会接受新的client请求，但是<strong>对于已经提交到raft但还未被shardkv apply的请求，无法被屏蔽</strong>。当数据A通过ShardMigration传递到gid101后，某个append{A,123}请求从raft被apply到shardkv，那么这个请求会被执行，并且会返回告知client，这个请求执行完成了。</p>
+<p>那么下一次Get{A}的时候，就会发现数据A缺失了123，因为这个append123应该在gid101上被执行，但是它却在gid100被执行完了，并且这个数据没有更新到gid101上</p>
+<p>为了解决这个问题，我在apply中也添加了一个checkShard(key)函数来检验请求是否正确，如果我们检测到了一个类似上述例子中apend{A,123}这样的请求，我们还是予以执行（个人选择，也可以选择不执行），但是会返回给client一个Err=ErrWrongGroup。</p>
+<p>同时与ShardMigration中的前置判断条件相结合</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//ShardMigration函数中的前置判断条件</span></span><br><span class="line"><span class="comment">//kv.configuration.Num&gt;=args.ConfigNum才向下执行</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">for</span> (kv.configuration.Num&lt;args.ConfigNum || kv.afterUpdateConfig&lt;args.LastConfigNum) &amp;&amp; time.Since(t0).Seconds()&lt;<span class="number">1</span>&#123;</span><br><span class="line">	time.Sleep(<span class="number">100</span>*time.Millisecond)</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">if</span> kv.configuration.Num&lt;args.ConfigNum || kv.afterUpdateConfig&lt;args.LastConfigNum&#123;</span><br><span class="line">	reply.WrongLeader=<span class="literal">true</span></span><br><span class="line">	<span class="keyword">return</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>假设gid100更新了config，那么在apply中就会对当前请求设置reply.Err=ErrWrongGroup，使client向gid101重发append{A,123}请求。而如果gid100还未更新config，那么在ShardMigration就会卡住直到它更新config为止</p>
+<p>从前面这几个错误解析中我们可以知道，ShardMigration中的前置判断条件是非常重要且缺一不可的</p>
+<p><strong>问题4：快速更新config导致状态信息与applyNum不匹配</strong></p>
+<p>在前面的基础上，考虑一种情况，数据A{key：A，value：0}从gid100转移到gid101，在转移过程中，gid100的raft向其shardkv apply了请求append{key：A,value：123，clientId:1，opnum:20}，由问题3的解法知，gid100仍然执行了append请求，同时更新applyNum[1]=20，并返回一个ErrWrongGroup给client1，让client1重新发送这个append请求给gid101</p>
+<p>但此时，在gid101还未接收到client1重发的append请求之前，新的config又来了，这次数据A要立即从gid101再转移回到gid100，这时由于我在ApplyNewConfig函数中使用覆盖的方式更新DB，那么gid.DB[A]从“0123”再次被覆盖为”0，但是由于applyNum=max（rf.applyNum,args.applyNum)，那么applyNum[1]仍然保留为20。</p>
+<p>这样的话我们的DB信息和applyNum就出现了不匹配的情况，此时client1又重新发送append{key：A,value：123，clientId:1，opnum:20}给gid100，但是由于applyNum[1]=20，这个请求被判定为request dup，不会被执行。这就导致了数据A缺失了”123”这个部分的信息</p>
+<p>我一开始想到了多个思路解决这个方法，让我们一一来想一想它们的可行性：</p>
+<p>（1）在问题3中，我们对于“过时”的请求选择不执行，直接返回ErrGroup。这样gid100中applyNum就不会更新到20，请求就不会被判定为request dup，而是正确执行</p>
+<p>这个解法看似正确，但是这只是对于leader而言，我们知道ShardMigration中是由leader来交接分片，那么我们上述的思路只能保证在leader中的正确性。但是对于每一个follower而言，它们更新config的时间点和leader不同（apply的时间点相同，但是更新不一定相同）可能这个请求在apply到shardkv时，它们的config还未更新，那么这个请求就不是”过时”的，它们会执行这个请求。在部分follower执行了这个请求后，我们又走上了错误的道路- -</p>
+<p>另一方面看，选择不执行“过时”的请求可能导致leader和follower的不一致，所以我选择执行“过时”请求使leader和follower都执行了相同的请求，保持了它们的一致</p>
+<p>（2）在ApplyNewConfig函数中，将<br>applyNum=max（rf.applyNum,args.applyNum)</p>
+<p>改为<br>applyNum=args.applyNum</p>
+<p>很显然这一定不对…因为这样会影响其他正常的client发送的请求，造成回退，进一步导致request dup</p>
+<p>在摒弃了上面两种我认为不可行的方法后，我选择了如下方法</p>
+<p>使用新的数据结构ErrGroupApply(clientId-&gt;key)来记录与“过时”请求相关的分片和clientId</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//在apply中添加代码</span></span><br><span class="line"><span class="keyword">if</span> err==ErrWrongGroup&#123;</span><br><span class="line">	kv.ErrGroupApply[op.ClientId]=Command.Key  </span><br><span class="line"><span class="comment">//记录这次过时请求的clientId和key</span></span><br><span class="line">&#125;<span class="keyword">else</span>&#123;</span><br><span class="line">	<span class="built_in">delete</span>(kv.ErrGroupApply,op.ClientId)</span><br><span class="line"><span class="comment">//执行正常时删除clientId和对应的key</span></span><br><span class="line"><span class="comment">//因为这一次会正常的执行说明之前的请求都被正确处理了</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>另一方面我们需要向ApplyNewConfig中添加一些代码</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> k,v:=<span class="keyword">range</span> kv.ErrGroupApply&#123;</span><br><span class="line">	<span class="keyword">if</span> args.ApplyNum[k]&lt;kv.applyNum[k]&#123;</span><br><span class="line"><span class="comment">//如果我的applyNum[clientId]更大，并且ErrGroupApply[clientId]存在说明出现</span></span><br><span class="line"><span class="comment">//出错情况，那么我们就在args中把这个applyNum和对应的部分数据删除，防止错误覆</span></span><br><span class="line"><span class="comment">//盖</span></span><br><span class="line">		<span class="built_in">delete</span>(args.ApplyNum,k)</span><br><span class="line">		<span class="built_in">delete</span>(args.State,v)</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>仅仅是这样还不够，这可能造成新的错误，所以我们也需要修改ShardMigration</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//ShardMigration中传递applyNum的部分代码</span></span><br><span class="line"><span class="keyword">for</span> index,v:=<span class="keyword">range</span> kv.applyNum&#123;</span><br><span class="line">	shd,ok:=kv.ErrGroupApply[index]</span><br><span class="line">	<span class="keyword">if</span> ok &amp;&amp; args.Shards!=(<span class="keyword">int</span>(shd[<span class="number">0</span>])%shardmaster.NShards)&#123;</span><br><span class="line">		reply.ApplyNum[index]=v<span class="number">-1</span></span><br><span class="line">	&#125;<span class="keyword">else</span>&#123;</span><br><span class="line">		reply.ApplyNum[index]=v</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>因为在ShardMigration中，无论请求的分片是什么，我们都会将全部client对应的applyNum传递出去。</p>
+<p>而修改shardMigration是为了防止  分片请求者没有更新对应errGroup  shard，但是却获得了对应的ApplyNum造成与问题4相同的错误。</p>
+<p>最后要记得将ErrGroupApply存入Snapshot，并修改restoreSnapshot和checkLogLength</p>
+<p>坦白来说，我觉得我对于问题4的解决方法并不好，基本是属于简单的亡羊补牢类型的debug，但是由于我中期划水，导致我在6.824lab上花费了过多的时间，所以只能是以完成主要部分为主，不进行过多的设计优化</p>
+<p><strong>总结</strong></p>
+<p>到此为止MIT6.824的lab就完成了，虽然在细节上有很多的不足，但是我认为以我目前的水平能够基本完成测试点覆盖的大多数情况就足够了，进一步的代码优化任务就取决于以后的我了。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
     <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/04/10/mit-6-824-4a-shardmaster/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1210,94 +1392,6 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/10/04/%E7%BB%BC%E8%AE%BE%E2%85%A0-linux%E7%B3%BB%E7%BB%9F%E4%B8%8B%E7%9A%84%E6%96%87%E4%BB%B6%E7%B3%BB%E7%BB%9F%E9%99%90%E9%87%8F%E7%9B%91%E6%8E%A7%E7%A8%8B%E5%BA%8F/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/uploads/avatar.png">
-      <meta itemprop="name" content="wwow">
-      <meta itemprop="description" content="努力可能会成功，但不努力真的很舒服">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="wwow's blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2019/10/04/%E7%BB%BC%E8%AE%BE%E2%85%A0-linux%E7%B3%BB%E7%BB%9F%E4%B8%8B%E7%9A%84%E6%96%87%E4%BB%B6%E7%B3%BB%E7%BB%9F%E9%99%90%E9%87%8F%E7%9B%91%E6%8E%A7%E7%A8%8B%E5%BA%8F/" class="post-title-link" itemprop="url">综设Ⅰ-Linux系统下的文件系统限量监控程序</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2019-10-04 21:50:33" itemprop="dateCreated datePublished" datetime="2019-10-04T21:50:33+08:00">2019-10-04</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-08-30 12:03:15" itemprop="dateModified" datetime="2020-08-30T12:03:15+08:00">2020-08-30</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E5%85%B6%E5%AE%83/" itemprop="url" rel="index"><span itemprop="name">其它</span></a>
-                </span>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p><strong>前置学习资料与要求</strong></p>
-<p>使用VMware安装一个虚拟机(建议安装Ubuntu，直接到官网下载最新的版本)</p>
-<p><a target="_blank" rel="noopener" href="https://www.linuxprobe.com/chapter-02.html">https://www.linuxprobe.com/chapter-02.html</a> (简单学习linux系统的基本命令，大概了解他们的作用，再需要使用的时候再翻看文档）</p>
-<p><a target="_blank" rel="noopener" href="https://www.linuxprobe.com/chapter-04.html">https://www.linuxprobe.com/chapter-04.html   (学会使用vim编辑器，尽量也学习一下Shell脚本的编写方法）</a></p>
-<p><a target="_blank" rel="noopener" href="https://www.linuxprobe.com/chapter-05.html">https://www.linuxprobe.com/chapter-05.html   (主要看</a>5.2文件权限和归属)  </p>
-<p><strong>实验内容与要求</strong></p>
-<p>在UNIX操作系统下用C语言或shell语言编写一个对用户使用文件系统（磁盘）空间的限量监控程序。通过菜单设置可选择指定用户在指定的文件系统下的存储空间和文件数量的使用限量。当程序监控到指定用户的使用量超限时，就向该用户提示警告信息，当用户的使用量降低时，停止警告提示并恢复正常。</p>
-<p><strong>实现方法</strong></p>
-<p>在网上找到类似的linux磁盘监视和警告脚本大多都是用shell语言来实现的，我想如果找不到用C来解决的方法的话，可能大家需要花一些时间去看一看shell脚本的语法(不用担心，大多与C相似，中间穿插一些linux系统的命令)</p>
-<p>1. <a target="_blank" rel="noopener" href="https://yq.aliyun.com/articles/39223">https://yq.aliyun.com/articles/39223</a>（linux监控磁盘空间和使用情况,需要了解一下df命令，下面给出学习链接)</p>
-<p>2.我想到一个方法，可以通过使用inode(文件索引节点，下方给出介绍链接)来完成任务。 首先编写脚本，当该磁盘下有新的文件创建时，查看该文件的inode节点，inode节点会记录它对应文件的大小和所有者，当我们发现该文件为limited user的文件时，就将该文件的大小记录下来，并专门开一个变量num和memory分别记录limited user在该磁盘下使用的存储空间和文件数量。当计算到超标的时候就打印警告，当使用量降低的时候就停止警告。</p>
-<p>这个方法也许还是要使用shell脚本来实现，因为我现在不太明白C语言怎么去导入和处理操作系统的信息(也许有同学知道的可以反馈给大家)</p>
-<p><strong>其他资料</strong></p>
-<p><a target="_blank" rel="noopener" href="https://www.runoob.com/linux/linux-filesystem.html">https://www.runoob.com/linux/linux-filesystem.html  (linux中磁盘操作命令，df,du,fdisk）</a></p>
-<p> <a target="_blank" rel="noopener" href="https://blog.csdn.net/xuz0917/article/details/79473562">https://blog.csdn.net/xuz0917/article/details/79473562  (innode文件索引节点的介绍)</a></p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1369,7 +1463,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">21</span>
+          <span class="site-state-item-count">22</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
